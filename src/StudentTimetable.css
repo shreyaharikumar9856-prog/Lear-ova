@@ -1,0 +1,328 @@
+/* MAIN CONTAINER */
+
+.student-timetable {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 10px 0 30px;
+  box-sizing: border-box;
+  color: #51465c;
+}
+
+/* HEADER */
+
+.timetable-header {
+  background: linear-gradient(120deg, #fff0f5, #f2edff);
+  border-radius: 22px;
+  padding: 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.timetable-tag {
+  color: #a77ca8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.timetable-header h2 {
+  font-size: 28px;
+  margin: 10px 0 5px;
+}
+
+.timetable-header p {
+  font-size: 13px;
+  color: #8d8195;
+  margin: 0;
+}
+
+.timetable-header-icon {
+  font-size: 48px;
+}
+
+/* SUMMARY */
+
+.timetable-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.timetable-summary-card {
+  background: white;
+  border: 1px solid #f0e8f1;
+  border-radius: 16px;
+  padding: 17px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 3px 12px rgba(90, 60, 100, 0.04);
+}
+
+.timetable-summary-card > span {
+  font-size: 28px;
+}
+
+.timetable-summary-card h3 {
+  margin: 0;
+  font-size: 23px;
+  color: #765c91;
+}
+
+.timetable-summary-card p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: #999;
+}
+
+/* WEEKLY TIMETABLE */
+
+.weekly-timetable {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.timetable-day {
+  background: white;
+  border: 1px solid #f0e8f1;
+  border-radius: 17px;
+  padding: 19px;
+  box-shadow: 0 3px 12px rgba(90, 60, 100, 0.035);
+}
+
+.timetable-day-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.day-icon {
+  width: 35px;
+  height: 35px;
+  border-radius: 11px;
+  background: #fff0f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timetable-day-heading h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.timetable-day-heading > span {
+  margin-left: auto;
+  font-size: 11px;
+  color: #a18da7;
+  background: #f8f3fa;
+  padding: 6px 10px;
+  border-radius: 20px;
+}
+
+/* CLASS CARDS */
+
+.day-class-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.timetable-class-card {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  padding: 16px;
+  border-radius: 13px;
+  background: #fcf9fd;
+  border: 1px solid #f2ebf5;
+  min-width: 0;
+}
+
+.class-time {
+  min-width: 95px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.class-time strong {
+  color: #80629a;
+  font-size: 14px;
+}
+
+.class-time span {
+  color: #aaa0b0;
+  font-size: 11px;
+}
+
+.class-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.class-details h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  text-transform: capitalize;
+}
+
+.class-details p {
+  margin: 3px 0;
+  color: #8d8195;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.class-details .class-notes {
+  color: #a28ba5;
+  font-size: 11px;
+  margin-top: 7px;
+}
+
+.join-class-button {
+  text-decoration: none;
+  background: #8c73b4;
+  color: white;
+  padding: 10px 14px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: 0.2s ease;
+}
+
+.join-class-button:hover {
+  background: #725697;
+  transform: translateY(-2px);
+}
+
+/* EMPTY STATE */
+
+.no-class-text {
+  font-size: 12px;
+  color: #b3a9b7;
+  padding: 5px 0;
+}
+
+.timetable-empty {
+  text-align: center;
+  background: white;
+  border: 1px dashed #e8dce9;
+  border-radius: 20px;
+  padding: 45px 20px;
+  margin-top: 15px;
+}
+
+.timetable-empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.timetable-empty h2 {
+  font-size: 19px;
+  color: #725b84;
+}
+
+.timetable-empty p {
+  font-size: 13px;
+  color: #a49aa9;
+  line-height: 1.7;
+  max-width: 380px;
+  margin: 0 auto;
+}
+
+/* LOADING */
+
+.timetable-loading {
+  text-align: center;
+  padding: 60px 20px;
+  color: #927ca1;
+}
+
+.timetable-spinner {
+  width: 35px;
+  height: 35px;
+  border: 3px solid #f0e5f1;
+  border-top-color: #9875b2;
+  border-radius: 50%;
+  animation: timetableSpin 0.8s linear infinite;
+  margin: 0 auto 15px;
+}
+
+@keyframes timetableSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* MOBILE RESPONSIVENESS */
+
+@media (max-width: 600px) {
+  .timetable-header {
+    padding: 20px;
+  }
+
+  .timetable-header h2 {
+    font-size: 23px;
+  }
+
+  .timetable-header-icon {
+    font-size: 35px;
+  }
+
+  .timetable-summary {
+    gap: 9px;
+  }
+
+  .timetable-summary-card {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .timetable-summary-card > span {
+    font-size: 22px;
+  }
+
+  .timetable-day {
+    padding: 14px;
+  }
+
+  .timetable-class-card {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .class-time {
+    min-width: 75px;
+  }
+
+  .class-details {
+    flex-basis: calc(100% - 100px);
+  }
+
+  .join-class-button {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 360px) {
+  .timetable-class-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .class-details {
+    width: 100%;
+  }
+
+  .join-class-button {
+    margin-left: 0;
+  }
+}
