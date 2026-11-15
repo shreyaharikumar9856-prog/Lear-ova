@@ -12,33 +12,66 @@ function Auth({ onLogin }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+
     setLoading(true);
     setMessage("");
 
     try {
-      const identifier =
-        role === "student"
-          ? `${loginId.trim().toLowerCase()}@students.learnova.invalid`
-          : loginId.trim();
-
-      const { data, error } =
-        await supabase.auth.signInWithPassword({
-          email: identifier,
-          password,
-        });
-
-      if (error) throw error;
+      let user;
 
       if (role === "student") {
+        // Student ID login through the Edge Function
+        const { data, error } =
+          await supabase.functions.invoke("student-login", {
+            body: {
+              student_id: loginId.trim().toUpperCase(),
+              password,
+            },
+          });
+
+        if (error) {
+          let errorMessage = error.message;
+
+          if (error.context) {
+            try {
+              const details = await error.context.clone().json();
+              errorMessage = details.error || errorMessage;
+            } catch {
+              // Keep the original error.
+            }
+          }
+
+          throw new Error(errorMessage);
+        }
+
+        if (!data?.success || !data?.session) {
+          throw new Error(
+            data?.error || "Invalid Student ID or password."
+          );
+        }
+
+        // Establish the student's Supabase session
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
+
+        if (sessionError) throw sessionError;
+
+        user = sessionData.user || data.user;
+
+        // Verify student profile and account status
         const { data: profile, error: profileError } =
           await supabase
             .from("students")
             .select("student_code, account_active")
-            .eq("user_id", data.user.id)
+            .eq("user_id", user.id)
             .maybeSingle();
 
         if (profileError || !profile) {
           await supabase.auth.signOut();
+
           throw new Error(
             "Student profile not found. Please contact your teacher."
           );
@@ -46,6 +79,7 @@ function Auth({ onLogin }) {
 
         if (!profile.account_active) {
           await supabase.auth.signOut();
+
           throw new Error(
             "Your account is inactive. Please contact your teacher."
           );
@@ -56,15 +90,30 @@ function Auth({ onLogin }) {
           loginId.trim().toUpperCase()
         ) {
           await supabase.auth.signOut();
+
           throw new Error("Invalid Student ID.");
         }
+
+      } else {
+        // Teacher login remains email and password
+        const { data, error } =
+          await supabase.auth.signInWithPassword({
+            email: loginId.trim(),
+            password,
+          });
+
+        if (error) throw error;
+
+        user = data.user;
       }
 
-      onLogin(data.user);
+      onLogin(user);
 
     } catch (error) {
       setMessageType("error");
-      setMessage(error.message || "Login failed. Please try again.");
+      setMessage(
+        error.message || "Login failed. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -84,7 +133,9 @@ function Auth({ onLogin }) {
       const { error } =
         await supabase.auth.resetPasswordForEmail(
           loginId.trim(),
-          { redirectTo: window.location.origin }
+          {
+            redirectTo: window.location.origin,
+          }
         );
 
       if (error) throw error;
@@ -119,7 +170,9 @@ function Auth({ onLogin }) {
 
           <h2>Welcome back!</h2>
 
-          <p>Sign in to continue your learning adventure.</p>
+          <p>
+            Sign in to continue your learning adventure.
+          </p>
         </div>
 
         <div className="auth-switch">
@@ -129,7 +182,9 @@ function Auth({ onLogin }) {
             onClick={() => {
               setRole("student");
               setLoginId("");
+              setPassword("");
               setMessage("");
+              setMessageType("info");
             }}
           >
             🎒 Student
@@ -141,7 +196,9 @@ function Auth({ onLogin }) {
             onClick={() => {
               setRole("teacher");
               setLoginId("");
+              setPassword("");
               setMessage("");
+              setMessageType("info");
             }}
           >
             🍎 Teacher
@@ -152,7 +209,9 @@ function Auth({ onLogin }) {
 
           <label className="auth-field">
             <span>
-              {role === "student" ? "Student ID" : "Teacher Email"}
+              {role === "student"
+                ? "Student ID"
+                : "Teacher Email"}
             </span>
 
             <input
@@ -185,7 +244,9 @@ function Auth({ onLogin }) {
               <button
                 className="auth-show-password"
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={() =>
+                  setShowPassword((value) => !value)
+                }
               >
                 {showPassword ? "Hide" : "Show"}
               </button>
@@ -225,7 +286,8 @@ function Auth({ onLogin }) {
 
         {role === "student" && (
           <p className="auth-toggle">
-            Don't have your login details? Contact your teacher.
+            Don't have your login details?
+            Contact your teacher.
           </p>
         )}
 
@@ -243,4 +305,4 @@ function Auth({ onLogin }) {
 }
 
 export default Auth;
-      
+
