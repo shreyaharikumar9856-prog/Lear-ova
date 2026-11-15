@@ -519,8 +519,8 @@ function App() {
 
   // Teacher dashboard
   if (role === "teacher") {
-    return <TeacherDashboard />;
-  }
+  return <TeacherDashboard onLogout={handleLogout} />;
+}
 
   if (role !== "student") {
     return <p>Unable to verify your account role.</p>;
@@ -602,6 +602,14 @@ function App() {
           onClick={() => setActiveTab("Settings")}
         >
           ⚙️ Settings
+        </button>
+                <button
+          type="button"
+          className="settings-button"
+          onClick={handleLogout}
+          style={{ marginTop: "8px" }}
+        >
+          🚪 Log Out
         </button>
       </aside>
 
