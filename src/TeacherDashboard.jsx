@@ -63,6 +63,10 @@ function TeacherDashboard() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [newStudentName, setNewStudentName] = useState("");
+  const [newStudentPassword, setNewStudentPassword] = useState("");
+  const [creatingStudent, setCreatingStudent] = useState(false);
+  const [createStudentMessage, setCreateStudentMessage] = useState("");
 
   const [attendanceDate, setAttendanceDate] = useState(getLocalDate());
   const [attendance, setAttendance] = useState({});
@@ -198,6 +202,67 @@ function TeacherDashboard() {
       },
     }));
   }
+  async function handleCreateStudent(e) {
+  e.preventDefault();
+
+  setCreatingStudent(true);
+  setCreateStudentMessage("");
+
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      "create-student",
+      {
+        body: {
+          full_name: newStudentName.trim(),
+          password: newStudentPassword,
+        },
+      }
+    );
+
+    if (error) {
+      let errorMessage = error.message;
+
+      if (error.context) {
+        try {
+          const details = await error.context.clone().json();
+          errorMessage = details.error || errorMessage;
+        } catch {
+          // Keep the original error message.
+        }
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    if (!data?.success) {
+      throw new Error(data?.error || "Unable to create student.");
+    }
+
+    setCreateStudentMessage(
+      `Success! Student ID: ${data.student_id}`
+    );
+
+    setNewStudentName("");
+    setNewStudentPassword("");
+
+    const { data: refreshedStudents, error: refreshError } =
+      await supabase
+        .from("students")
+        .select("id, full_name, email, created_at")
+        .order("created_at", { ascending: false });
+
+    if (!refreshError) {
+      setStudents(refreshedStudents || []);
+    }
+
+  } catch (error) {
+    setCreateStudentMessage(
+      error.message || "Something went wrong."
+    );
+  } finally {
+    setCreatingStudent(false);
+  }
+}
 
   function getNextMonthStart(monthString) {
     const [year, month] = monthString.split("-").map(Number);
@@ -357,7 +422,7 @@ function TeacherDashboard() {
     );
   }
 
-  function renderStudentsSection() {
+  <form   onSubmit={handleCreateStudent}   style={{     padding: "20px",     margin: "20px 0",     background: "#faf7ff",     borderRadius: "12px",   }} >   <h3>➕ Register New Student</h3>    <label>     Student Full Name     <input       type="text"       value={newStudentName}       onChange={(e) => setNewStudentName(e.target.value)}       placeholder="Enter student name"       required       style={{ display: "block", width: "100%", padding: "12px", margin: "8px 0" }}     />   </label>    <label>     Temporary Password     <input       type="password"       value={newStudentPassword}       onChange={(e) => setNewStudentPassword(e.target.value)}       placeholder="Minimum 8 characters"       minLength={8}       required       style={{ display: "block", width: "100%", padding: "12px", margin: "8px 0" }}     />   </label>    <button     type="submit"     className="teacher-primary-button"     disabled={creatingStudent}   >     {creatingStudent ? "Creating Account..." : "Create Student Account"}   </button>    {createStudentMessage && (     <p role="status" style={{ marginTop: "12px" }}>       {createStudentMessage}     </p>   )} </form>  {renderStudentsTable()}
     return (
       <section className="teacher-panel">
         <div className="teacher-panel-heading">
