@@ -93,6 +93,20 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+    // Logout function
+  async function handleLogout() {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      alert("Unable to log out. Please try again.");
+      console.error(error);
+      return;
+    }
+
+    setActiveTab("Dashboard");
+    setRole(null);
+    setSelectedAvatar(null);
+  }
   // Fetch the user's role
   useEffect(() => {
     let cancelled = false;
