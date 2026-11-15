@@ -2,103 +2,78 @@ import { useState } from "react";
 import { supabase } from "./supabaseClient";
 
 function Auth({ onLogin }) {
-  const [isLogin, setIsLogin] = useState(true);
   const [role, setRole] = useState("student");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("info");
   const [loading, setLoading] = useState(false);
 
-  // LOGIN AND REGISTRATION
   async function handleSubmit(e) {
     e.preventDefault();
-
-    setMessage("");
     setLoading(true);
+    setMessage("");
 
     try {
-      if (isLogin) {
-        const { data, error } =
-          await supabase.auth.signInWithPassword({
-            email: email.trim(),
-            password,
-          });
+      const identifier =
+        role === "student"
+          ? `${loginId.trim().toLowerCase()}@students.learnova.invalid`
+          : loginId.trim();
 
-        if (error) throw error;
-
-        onLogin(data.user);
-      } else {
-        if (role !== "student") {
-          setMessageType("error");
-          setMessage(
-            "Teacher accounts must be created by the app administrator."
-          );
-          return;
-        }
-
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
+      const { data, error } =
+        await supabase.auth.signInWithPassword({
+          email: identifier,
           password,
-          options: {
-            data: {
-              full_name: name.trim(),
-              role: "student",
-            },
-          },
         });
 
-        if (error) throw error;
+      if (error) throw error;
 
-        if (data.user) {
-          const { error: studentError } = await supabase
+      if (role === "student") {
+        const { data: profile, error: profileError } =
+          await supabase
             .from("students")
-            .insert([
-              {
-                user_id: data.user.id,
-                full_name: name.trim(),
-                email: email.trim(),
-              },
-            ]);
+            .select("student_code, account_active")
+            .eq("user_id", data.user.id)
+            .maybeSingle();
 
-          if (studentError) {
-            console.error(
-              "Error saving student:",
-              studentError.message
-            );
-
-            setMessageType("error");
-            setMessage(
-              "Your account was created, but your student details could not be saved. Please contact your teacher."
-            );
-            return;
-          }
-        }
-
-        if (data.session) {
-          onLogin(data.user);
-        } else {
-          setMessageType("success");
-          setMessage(
-            "Registration successful! Please check your email to confirm your account before logging in."
+        if (profileError || !profile) {
+          await supabase.auth.signOut();
+          throw new Error(
+            "Student profile not found. Please contact your teacher."
           );
         }
+
+        if (!profile.account_active) {
+          await supabase.auth.signOut();
+          throw new Error(
+            "Your account is inactive. Please contact your teacher."
+          );
+        }
+
+        if (
+          profile.student_code?.toUpperCase() !==
+          loginId.trim().toUpperCase()
+        ) {
+          await supabase.auth.signOut();
+          throw new Error("Invalid Student ID.");
+        }
       }
+
+      onLogin(data.user);
+
     } catch (error) {
       setMessageType("error");
-      setMessage(error.message || "Something went wrong. Please try again.");
+      setMessage(error.message || "Login failed. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  // FORGOT PASSWORD
   async function handleForgotPassword() {
-    if (!email.trim()) {
+    if (role !== "teacher" || !loginId.trim()) {
       setMessageType("error");
-      setMessage("Please enter your email address first.");
+      setMessage("Enter your teacher email address first.");
       return;
     }
 
@@ -108,42 +83,26 @@ function Auth({ onLogin }) {
     try {
       const { error } =
         await supabase.auth.resetPasswordForEmail(
-          email.trim(),
-          {
-            redirectTo: window.location.origin,
-          }
+          loginId.trim(),
+          { redirectTo: window.location.origin }
         );
 
       if (error) throw error;
 
       setMessageType("success");
-      setMessage(
-        "If an account exists for this email, a password reset link will be sent."
-      );
+      setMessage("Check your email for the password reset link.");
+
     } catch (error) {
       setMessageType("error");
-      setMessage(
-        error.message || "Unable to send the reset email. Please try again."
-      );
+      setMessage(error.message);
     } finally {
       setLoading(false);
     }
   }
 
-  // SWITCH BETWEEN LOGIN AND REGISTRATION
-  function switchMode() {
-    setIsLogin((current) => !current);
-    setMessage("");
-    setMessageType("info");
-    setPassword("");
-    setShowPassword(false);
-  }
-
   return (
     <main className="auth-page">
       <section className="auth-card">
-
-        
 
         <h1 className="auth-brand-name">
           Learñova<span>.</span>
@@ -158,24 +117,20 @@ function Auth({ onLogin }) {
             YOUR LEARNING JOURNEY STARTS HERE
           </p>
 
-          <h2>
-            {isLogin ? "Welcome back!" : "Let's get started!"}
-          </h2>
+          <h2>Welcome back!</h2>
 
-          <p>
-            {isLogin
-              ? "Sign in to continue your learning adventure."
-              : "Create your student account and join Learnova."}
-          </p>
+          <p>Sign in to continue your learning adventure.</p>
         </div>
-
-        {/* STUDENT / TEACHER SELECTION */}
 
         <div className="auth-switch">
           <button
             type="button"
             className={role === "student" ? "selected" : ""}
-            onClick={() => setRole("student")}
+            onClick={() => {
+              setRole("student");
+              setLoginId("");
+              setMessage("");
+            }}
           >
             🎒 Student
           </button>
@@ -183,46 +138,33 @@ function Auth({ onLogin }) {
           <button
             type="button"
             className={role === "teacher" ? "selected" : ""}
-            onClick={() => setRole("teacher")}
+            onClick={() => {
+              setRole("teacher");
+              setLoginId("");
+              setMessage("");
+            }}
           >
             🍎 Teacher
           </button>
         </div>
 
-        {!isLogin && role === "teacher" && (
-          <div className="auth-notice">
-            Teacher accounts must be created by the Learnova administrator.
-            Select Student to register.
-          </div>
-        )}
-
-        {/* LOGIN / REGISTRATION FORM */}
-
         <form className="auth-form" onSubmit={handleSubmit}>
 
-          {!isLogin && role === "student" && (
-            <label className="auth-field">
-              <span>Full name</span>
-
-              <input
-                type="text"
-                placeholder="Enter your full name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </label>
-          )}
-
           <label className="auth-field">
-            <span>Email address</span>
+            <span>
+              {role === "student" ? "Student ID" : "Teacher Email"}
+            </span>
 
             <input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
+              type={role === "student" ? "text" : "email"}
+              placeholder={
+                role === "student"
+                  ? "Enter your Learnova ID"
+                  : "Enter your email address"
+              }
+              value={loginId}
+              onChange={(e) => setLoginId(e.target.value)}
+              autoComplete="username"
               required
             />
           </label>
@@ -233,29 +175,24 @@ function Auth({ onLogin }) {
             <div className="auth-password-wrap">
               <input
                 type={showPassword ? "text" : "password"}
-                placeholder="At least 6 characters"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                minLength={6}
-                autoComplete={
-                  isLogin ? "current-password" : "new-password"
-                }
+                autoComplete="current-password"
                 required
               />
 
               <button
                 className="auth-show-password"
                 type="button"
-                onClick={() =>
-                  setShowPassword((value) => !value)
-                }
+                onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? "Hide" : "Show"}
               </button>
             </div>
           </label>
 
-          {isLogin && (
+          {role === "teacher" && (
             <div className="auth-forgot-row">
               <button
                 type="button"
@@ -270,18 +207,12 @@ function Auth({ onLogin }) {
           <button
             className="auth-submit"
             type="submit"
-            disabled={loading || (!isLogin && role === "teacher")}
+            disabled={loading}
           >
-            {loading
-              ? "Please wait..."
-              : isLogin
-                ? "Log In →"
-                : "Create Student Account →"}
+            {loading ? "Please wait..." : "Log In →"}
           </button>
 
         </form>
-
-        {/* SUCCESS / ERROR MESSAGE */}
 
         {message && (
           <div
@@ -292,21 +223,15 @@ function Auth({ onLogin }) {
           </div>
         )}
 
+        {role === "student" && (
+          <p className="auth-toggle">
+            Don't have your login details? Contact your teacher.
+          </p>
+        )}
+
         <div className="auth-divider">
           <span>✦</span>
         </div>
-
-        <p className="auth-toggle">
-          {isLogin
-            ? "New to Learnova?"
-            : "Already have an account?"}
-
-          {" "}
-
-          <button type="button" onClick={switchMode}>
-            {isLogin ? "Create an account" : "Log in"}
-          </button>
-        </p>
 
         <p className="auth-footer">
           Made for curious minds <span>♥</span>
@@ -318,3 +243,4 @@ function Auth({ onLogin }) {
 }
 
 export default Auth;
+      
