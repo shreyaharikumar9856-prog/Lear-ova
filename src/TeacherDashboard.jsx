@@ -389,7 +389,7 @@ function TeacherDashboard() {
 
   const activeMenuItem = teacherMenu.find((item) => item.id === activeSection);
 
-  function renderStudentsTable() {
+    function renderStudentsTable() {
     if (loading) return <p className="teacher-state">Loading students...</p>;
     if (error) return <p className="teacher-error">Unable to load students: {error}</p>;
     if (students.length === 0) return <p className="teacher-state">No students found yet.</p>;
@@ -422,7 +422,7 @@ function TeacherDashboard() {
     );
   }
 
-  <form   onSubmit={handleCreateStudent}   style={{     padding: "20px",     margin: "20px 0",     background: "#faf7ff",     borderRadius: "12px",   }} >   <h3>➕ Register New Student</h3>    <label>     Student Full Name     <input       type="text"       value={newStudentName}       onChange={(e) => setNewStudentName(e.target.value)}       placeholder="Enter student name"       required       style={{ display: "block", width: "100%", padding: "12px", margin: "8px 0" }}     />   </label>    <label>     Temporary Password     <input       type="password"       value={newStudentPassword}       onChange={(e) => setNewStudentPassword(e.target.value)}       placeholder="Minimum 8 characters"       minLength={8}       required       style={{ display: "block", width: "100%", padding: "12px", margin: "8px 0" }}     />   </label>    <button     type="submit"     className="teacher-primary-button"     disabled={creatingStudent}   >     {creatingStudent ? "Creating Account..." : "Create Student Account"}   </button>    {createStudentMessage && (     <p role="status" style={{ marginTop: "12px" }}>       {createStudentMessage}     </p>   )} </form>  {renderStudentsTable()}
+  function renderStudentsSection() {
     return (
       <section className="teacher-panel">
         <div className="teacher-panel-heading">
@@ -432,6 +432,58 @@ function TeacherDashboard() {
           </div>
           <span className="teacher-count-pill">{students.length} students</span>
         </div>
+
+        <form
+          onSubmit={handleCreateStudent}
+          style={{
+            padding: "20px",
+            margin: "20px 0",
+            background: "#faf7ff",
+            borderRadius: "12px",
+          }}
+        >
+          <h3>➕ Register New Student</h3>
+
+          <label>
+            Student Full Name
+            <input
+              type="text"
+              value={newStudentName}
+              onChange={(e) => setNewStudentName(e.target.value)}
+              placeholder="Enter student name"
+              required
+              style={{ display: "block", width: "100%", padding: "12px", margin: "8px 0" }}
+            />
+          </label>
+
+          <label>
+            Temporary Password
+            <input
+              type="password"
+              value={newStudentPassword}
+              onChange={(e) => setNewStudentPassword(e.target.value)}
+              placeholder="Minimum 8 characters"
+              minLength={8}
+              required
+              style={{ display: "block", width: "100%", padding: "12px", margin: "8px 0" }}
+            />
+          </label>
+
+          <button
+            type="submit"
+            className="teacher-primary-button"
+            disabled={creatingStudent}
+          >
+            {creatingStudent ? "Creating Account..." : "Create Student Account"}
+          </button>
+
+          {createStudentMessage && (
+            <p role="status" style={{ marginTop: "12px" }}>
+              {createStudentMessage}
+            </p>
+          )}
+        </form>
+
         {renderStudentsTable()}
       </section>
     );
