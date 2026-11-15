@@ -58,7 +58,7 @@ const sectionDescriptions = {
   "Subject Management": "Assign subjects to individual students.",
 };
 
-function TeacherDashboard() {
+function TeacherDashboard({ onLogout }) {
   const [activeSection, setActiveSection] = useState("Overview");
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -829,6 +829,15 @@ function TeacherDashboard() {
           <strong>Little steps, big impact.</strong>
           <p>Thank you for helping learners grow!</p>
         </div>
+                <button
+          type="button"
+          className="teacher-nav-item"
+          onClick={onLogout}
+          style={{ marginTop: "12px", color: "#d9534f" }}
+        >
+          <span className="teacher-nav-icon">🚪</span>
+          <span>Log Out</span>
+        </button>
       </aside>
 
       <main className="teacher-main-content">
