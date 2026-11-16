@@ -11,6 +11,7 @@ import CoinManagement from "./CoinManagement";
 import LeagueManagement from "./LeagueManagement";
 import TeacherSubjectManagement from "./TeacherSubjectManagement";
 import SubjectNotesManagement from "./SubjectNotesManagement";
+import TestMaker from "./TestMaker";
 import "./TeacherDashboard.css";
 
 function getLocalDate() {
@@ -41,6 +42,7 @@ const teacherMenu = [
   { id: "League Management", icon: "🏆", label: "League Management" },
   { id: "Subject Management", icon: "📚", label: "Subject Management" },
   { id: "Subject Notes", icon: "📖", label: "Subject Notes" },
+  { id: "Test Maker", icon: "📝", label: "Test Maker" },
 ];
 
 const sectionDescriptions = {
@@ -59,6 +61,7 @@ const sectionDescriptions = {
   "League Management": "Manage monthly student leagues.",
   "Subject Management": "Assign subjects to individual students.",
   "Subject Notes": "Upload and manage subject-wise learning materials.",
+  "Test Maker": "Create customised tests and examinations for your students.",
 };
 
 function TeacherDashboard({ onLogout }) {
@@ -789,6 +792,8 @@ function TeacherDashboard({ onLogout }) {
         return <TeacherSubjectManagement />;
       case "Subject Notes":
         return <SubjectNotesManagement />;
+      case "Test Maker":
+        return <TestMaker />;
       default:
         return renderOverview();
     }
