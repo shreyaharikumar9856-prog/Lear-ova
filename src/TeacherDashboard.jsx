@@ -794,7 +794,7 @@ function TeacherDashboard({ onLogout }) {
         return <SubjectNotesManagement />;
       case "Test Maker":
         return <TestMaker />;
-      default:
+      default: 
         return renderOverview();
     }
   }
