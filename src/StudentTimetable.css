@@ -326,3 +326,61 @@
     margin-left: 0;
   }
 }
+/* TEACHER NAME */
+
+.class-teacher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 11px;
+  background: #f1edff;
+  border: 1px solid #e6dcfa;
+  border-radius: 20px;
+  color: #715a91;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* IMPROVED CLASS DETAILS */
+
+.class-details h4 {
+  color: #66527f;
+  font-weight: 700;
+}
+
+.class-details p {
+  color: #82768d;
+  line-height: 1.6;
+}
+
+/* TIME DISPLAY */
+
+.class-time {
+  background: #f8f3ff;
+  padding: 10px;
+  border-radius: 11px;
+  min-width: 105px;
+}
+
+.class-time strong {
+  color: #8062a5;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.class-time span {
+  color: #a397b0;
+}
+
+/* MEETING BUTTON */
+
+.join-class-button {
+  background: linear-gradient(135deg, #9279bd, #7864a6);
+  box-shadow: 0 3px 8px rgba(120, 100, 166, 0.15);
+}
+
+.join-class-button:hover {
+  background: #705492;
+  transform: translateY(-2px);
+}
