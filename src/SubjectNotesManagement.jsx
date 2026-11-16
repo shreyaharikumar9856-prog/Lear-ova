@@ -15,9 +15,15 @@ const EMPTY_FORM = {
 function SubjectNotesManagement() {
   const [subjects, setSubjects] = useState([]);
   const [notes, setNotes] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [enrollments, setEnrollments] = useState([]);
+
   const [form, setForm] = useState(EMPTY_FORM);
   const [selectedFile, setSelectedFile] = useState(null);
   const [editingNote, setEditingNote] = useState(null);
+
+  const [sharingMode, setSharingMode] = useState("all");
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -27,7 +33,7 @@ function SubjectNotesManagement() {
   const [messageType, setMessageType] = useState("success");
 
   // =====================================
-  // LOAD SUBJECTS AND NOTES
+  // LOAD SUBJECTS, STUDENTS AND NOTES
   // =====================================
 
   useEffect(() => {
@@ -39,7 +45,13 @@ function SubjectNotesManagement() {
     setMessage("");
 
     try {
-      const [subjectResult, noteResult] = await Promise.all([
+      const [
+        subjectResult,
+        noteResult,
+        studentResult,
+        enrollmentResult,
+      ] = await Promise.all([
+
         supabase
           .from("subjects")
           .select("id, subject_name")
@@ -48,16 +60,29 @@ function SubjectNotesManagement() {
         supabase
           .from("subject_notes")
           .select(
-            "id, subject_id, title, description, file_name, file_path, teacher_name, uploaded_at"
+            "id, subject_id, title, description, file_name, file_path, teacher_name, uploaded_at, available_to_all"
           )
           .order("uploaded_at", { ascending: false }),
+
+        supabase
+          .from("students")
+          .select("id, full_name")
+          .order("full_name"),
+
+        supabase
+          .from("student_subjects")
+          .select("student_id, subject_id"),
       ]);
 
       if (subjectResult.error) throw subjectResult.error;
       if (noteResult.error) throw noteResult.error;
+      if (studentResult.error) throw studentResult.error;
+      if (enrollmentResult.error) throw enrollmentResult.error;
 
       setSubjects(subjectResult.data || []);
       setNotes(noteResult.data || []);
+      setStudents(studentResult.data || []);
+      setEnrollments(enrollmentResult.data || []);
 
       if (!form.subject_id && subjectResult.data?.length) {
         setForm((previous) => ({
@@ -81,7 +106,7 @@ function SubjectNotesManagement() {
   }
 
   // =====================================
-  // HANDLE FORM CHANGES
+  // FORM CHANGES
   // =====================================
 
   function handleChange(event) {
@@ -91,10 +116,50 @@ function SubjectNotesManagement() {
       ...previous,
       [name]: value,
     }));
+
+    if (name === "subject_id") {
+      setSelectedStudentIds([]);
+    }
   }
 
   // =====================================
-  // UPLOAD FILE TO SUPABASE STORAGE
+  // STUDENTS ENROLLED IN SELECTED SUBJECT
+  // =====================================
+
+  const eligibleStudents = students.filter((student) =>
+    enrollments.some(
+      (enrollment) =>
+        String(enrollment.student_id) === String(student.id) &&
+        String(enrollment.subject_id) === String(form.subject_id)
+    )
+  );
+
+  // =====================================
+  // SELECT / DESELECT STUDENTS
+  // =====================================
+
+  function toggleStudent(studentId) {
+    const id = String(studentId);
+
+    setSelectedStudentIds((previous) =>
+      previous.includes(id)
+        ? previous.filter((item) => item !== id)
+        : [...previous, id]
+    );
+  }
+
+  function selectAllStudents() {
+    setSelectedStudentIds(
+      eligibleStudents.map((student) => String(student.id))
+    );
+  }
+
+  function clearSelectedStudents() {
+    setSelectedStudentIds([]);
+  }
+
+  // =====================================
+  // FILE UPLOAD
   // =====================================
 
   async function uploadFile(file, subjectId) {
@@ -136,6 +201,8 @@ function SubjectNotesManagement() {
 
     setSelectedFile(null);
     setEditingNote(null);
+    setSharingMode("all");
+    setSelectedStudentIds([]);
 
     const input = document.getElementById(
       "subject-note-file"
@@ -150,7 +217,8 @@ function SubjectNotesManagement() {
   // EDIT EXISTING NOTE
   // =====================================
 
-  function startEditing(note) {
+  async function startEditing(note) {
+    setMessage("");
     setEditingNote(note);
 
     setForm({
@@ -170,6 +238,33 @@ function SubjectNotesManagement() {
       input.value = "";
     }
 
+    try {
+      if (note.available_to_all === true) {
+        setSharingMode("all");
+        setSelectedStudentIds([]);
+      } else {
+        setSharingMode("selected");
+
+        const { data, error } = await supabase
+          .from("subject_note_students")
+          .select("student_id")
+          .eq("note_id", note.id);
+
+        if (error) throw error;
+
+        setSelectedStudentIds(
+          (data || []).map((item) =>
+            String(item.student_id)
+          )
+        );
+      }
+    } catch (error) {
+      setMessage(
+        `Unable to load selected students: ${error.message}`
+      );
+      setMessageType("error");
+    }
+
     window.scrollTo({
       top: 0,
       behavior: "smooth",
@@ -177,7 +272,7 @@ function SubjectNotesManagement() {
   }
 
   // =====================================
-  // SAVE OR UPDATE STUDY MATERIAL
+  // SAVE OR UPDATE NOTE
   // =====================================
 
   async function saveNote(event) {
@@ -187,6 +282,7 @@ function SubjectNotesManagement() {
     setMessage("");
 
     let newlyUploadedPath = null;
+    let databaseSaved = false;
 
     try {
       if (!form.subject_id) {
@@ -194,33 +290,46 @@ function SubjectNotesManagement() {
       }
 
       if (!form.title.trim()) {
-        throw new Error(
-          "Please enter a title for the material."
-        );
+        throw new Error("Please enter a material title.");
       }
 
       if (!form.teacher_name.trim()) {
-        throw new Error(
-          "Please enter the teacher's name."
-        );
+        throw new Error("Please enter the teacher's name.");
       }
 
       if (!editingNote && !selectedFile) {
-        throw new Error(
-          "Please select a file to upload."
-        );
+        throw new Error("Please select a file to upload.");
       }
 
       if (
         selectedFile &&
         selectedFile.size > MAX_FILE_SIZE
       ) {
+        throw new Error("File must be smaller than 50 MB.");
+      }
+
+      if (sharingMode === "selected" &&
+          selectedStudentIds.length === 0) {
         throw new Error(
-          "Please select a file smaller than 50 MB."
+          "Please select at least one student."
         );
       }
 
-      // Upload selected file
+      const validSelectedStudents =
+        eligibleStudents.filter((student) =>
+          selectedStudentIds.includes(String(student.id))
+        );
+
+      if (
+        sharingMode === "selected" &&
+        validSelectedStudents.length === 0
+      ) {
+        throw new Error(
+          "The selected students are not enrolled in this subject."
+        );
+      }
+
+      // Upload file if selected
 
       if (selectedFile) {
         newlyUploadedPath = await uploadFile(
@@ -229,13 +338,14 @@ function SubjectNotesManagement() {
         );
       }
 
-      // Prepare database record
+      // Prepare note record
 
       const payload = {
         subject_id: form.subject_id,
         title: form.title.trim(),
         description: form.description.trim() || null,
         teacher_name: form.teacher_name.trim(),
+        available_to_all: sharingMode === "all",
       };
 
       if (selectedFile && newlyUploadedPath) {
@@ -243,40 +353,73 @@ function SubjectNotesManagement() {
         payload.file_path = newlyUploadedPath;
       }
 
-      let result;
+      let noteId;
 
-      // Update existing material
+      // UPDATE EXISTING NOTE
 
       if (editingNote) {
-        result = await supabase
+        const { error } = await supabase
           .from("subject_notes")
           .update(payload)
           .eq("id", editingNote.id);
 
+        if (error) throw error;
+
+        noteId = editingNote.id;
+
       } else {
 
-        // Insert new material
+        // CREATE NEW NOTE
 
-        result = await supabase
+        const { data, error } = await supabase
           .from("subject_notes")
           .insert({
             ...payload,
             file_name: selectedFile.name,
             file_path: newlyUploadedPath,
-          });
+          })
+          .select("id")
+          .single();
+
+        if (error) throw error;
+
+        noteId = data.id;
       }
 
-      if (result.error) {
-        if (newlyUploadedPath) {
-          await supabase.storage
-            .from(BUCKET_NAME)
-            .remove([newlyUploadedPath]);
+      databaseSaved = true;
+
+      // REMOVE PREVIOUS STUDENT ACCESS RECORDS
+
+      const { error: deleteRecipientsError } =
+        await supabase
+          .from("subject_note_students")
+          .delete()
+          .eq("note_id", noteId);
+
+      if (deleteRecipientsError) {
+        throw deleteRecipientsError;
+      }
+
+      // SAVE SELECTED STUDENT ACCESS
+
+      if (sharingMode === "selected") {
+        const recipientRows = validSelectedStudents.map(
+          (student) => ({
+            note_id: noteId,
+            student_id: student.id,
+          })
+        );
+
+        const { error: recipientError } = await supabase
+          .from("subject_note_students")
+          .insert(recipientRows);
+
+        if (recipientError) {
+          throw recipientError;
         }
-
-        throw result.error;
       }
 
-      // Remove old file after successful replacement
+      // DELETE OLD FILE AFTER SUCCESSFUL REPLACEMENT
 
       if (
         editingNote &&
@@ -290,7 +433,7 @@ function SubjectNotesManagement() {
 
         if (cleanupError) {
           console.warn(
-            "Old note file cleanup failed:",
+            "Old file cleanup failed:",
             cleanupError.message
           );
         }
@@ -313,9 +456,17 @@ function SubjectNotesManagement() {
     } catch (error) {
       console.error("Save subject note error:", error);
 
+      // Remove unused newly uploaded file only
+      // when the database was not updated.
+
+      if (newlyUploadedPath && !databaseSaved) {
+        await supabase.storage
+          .from(BUCKET_NAME)
+          .remove([newlyUploadedPath]);
+      }
+
       setMessage(
-        error.message ||
-          "Unable to save study material."
+        error.message || "Unable to save study material."
       );
 
       setMessageType("error");
@@ -326,7 +477,7 @@ function SubjectNotesManagement() {
   }
 
   // =====================================
-  // DELETE STUDY MATERIAL
+  // DELETE NOTE
   // =====================================
 
   async function deleteNote(note) {
@@ -339,16 +490,12 @@ function SubjectNotesManagement() {
     setMessage("");
 
     try {
-      const { error: deleteError } = await supabase
+      const { error } = await supabase
         .from("subject_notes")
         .delete()
         .eq("id", note.id);
 
-      if (deleteError) {
-        throw deleteError;
-      }
-
-      // Delete associated storage file
+      if (error) throw error;
 
       if (note.file_path) {
         const { error: storageError } =
@@ -358,13 +505,11 @@ function SubjectNotesManagement() {
 
         if (storageError) {
           setMessage(
-            `The note record was deleted, but its stored file could not be removed: ${storageError.message}`
+            `Note deleted, but file cleanup failed: ${storageError.message}`
           );
 
           setMessageType("error");
-
           await loadData();
-
           return;
         }
       }
@@ -375,18 +520,12 @@ function SubjectNotesManagement() {
 
       await loadData();
 
-      setMessage(
-        "Study material deleted successfully."
-      );
-
+      setMessage("Study material deleted successfully.");
       setMessageType("success");
 
     } catch (error) {
-      console.error("Delete subject note error:", error);
-
       setMessage(
-        error.message ||
-          "Unable to delete this material."
+        error.message || "Unable to delete this material."
       );
 
       setMessageType("error");
@@ -394,14 +533,11 @@ function SubjectNotesManagement() {
   }
 
   // =====================================
-  // OPEN STUDY MATERIAL
+  // OPEN NOTE
   // =====================================
 
   async function openNote(note) {
     setOpeningNote(note.id);
-    setMessage("");
-
-    // Open a tab during the click event
 
     const newTab = window.open("about:blank", "_blank");
 
@@ -414,9 +550,7 @@ function SubjectNotesManagement() {
         .from(BUCKET_NAME)
         .createSignedUrl(note.file_path, 120);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (newTab) {
         newTab.location.href = data.signedUrl;
@@ -425,11 +559,7 @@ function SubjectNotesManagement() {
       }
 
     } catch (error) {
-      if (newTab) {
-        newTab.close();
-      }
-
-      console.error("Open subject note error:", error);
+      if (newTab) newTab.close();
 
       setMessage(
         error.message || "Unable to open this file."
@@ -443,7 +573,7 @@ function SubjectNotesManagement() {
   }
 
   // =====================================
-  // GET SUBJECT NAME
+  // SUBJECT NAME
   // =====================================
 
   function subjectName(subjectId) {
@@ -456,7 +586,7 @@ function SubjectNotesManagement() {
   }
 
   // =====================================
-  // FORMAT DATE
+  // DATE FORMAT
   // =====================================
 
   function formatDate(value) {
@@ -497,20 +627,16 @@ function SubjectNotesManagement() {
       <div className="snm-header">
 
         <div>
-
           <span className="snm-eyebrow">
             LEARÑOVA • TEACHER SPACE
           </span>
 
-          <h2>
-            📚 Subject Notes Management
-          </h2>
+          <h2>📚 Subject Notes Management</h2>
 
           <p>
             Upload and organise notes, worksheets and
             learning materials for each subject.
           </p>
-
         </div>
 
         <div className="snm-header-icon">
@@ -539,7 +665,7 @@ function SubjectNotesManagement() {
       )}
 
 
-      {/* UPLOAD PANEL */}
+      {/* UPLOAD FORM */}
 
       <div className="snm-panel">
 
@@ -550,7 +676,6 @@ function SubjectNotesManagement() {
           </span>
 
           <div>
-
             <h3>
               {editingNote
                 ? "Edit Study Material"
@@ -558,10 +683,9 @@ function SubjectNotesManagement() {
             </h3>
 
             <p>
-              Choose the subject so enrolled students can
-              find the material in My Subjects.
+              Choose a subject and select which students
+              can access this material.
             </p>
-
           </div>
 
         </div>
@@ -570,8 +694,8 @@ function SubjectNotesManagement() {
         {subjects.length === 0 && !loading ? (
 
           <div className="snm-empty">
-            No subjects were found. Add subjects in
-            Subject Management first.
+            No subjects found. Add subjects in Subject
+            Management first.
           </div>
 
         ) : (
@@ -679,6 +803,156 @@ function SubjectNotesManagement() {
             </div>
 
 
+            {/* STUDENT ACCESS SETTINGS */}
+
+            <div className="snm-sharing-section">
+
+              <h4>
+                👩‍🎓 Make Available To
+              </h4>
+
+              <p>
+                Choose who can access this study material.
+              </p>
+
+
+              <label className="snm-sharing-option">
+
+                <input
+                  type="radio"
+                  name="sharingMode"
+                  value="all"
+                  checked={sharingMode === "all"}
+                  onChange={() => {
+                    setSharingMode("all");
+                    setSelectedStudentIds([]);
+                  }}
+                />
+
+                <span>
+                  <strong>
+                    All students enrolled in this subject
+                  </strong>
+
+                  <small>
+                    Every student taking this subject can
+                    access the uploaded material.
+                  </small>
+                </span>
+
+              </label>
+
+
+              <label className="snm-sharing-option">
+
+                <input
+                  type="radio"
+                  name="sharingMode"
+                  value="selected"
+                  checked={sharingMode === "selected"}
+                  onChange={() => setSharingMode("selected")}
+                />
+
+                <span>
+                  <strong>
+                    Select specific students
+                  </strong>
+
+                  <small>
+                    Only the students selected below
+                    can access this material.
+                  </small>
+                </span>
+
+              </label>
+
+
+              {/* STUDENT CHECKBOX LIST */}
+
+              {sharingMode === "selected" && (
+
+                <div className="snm-student-selection">
+
+                  <div className="snm-student-selection-heading">
+
+                    <strong>
+                      Students enrolled in this subject
+                    </strong>
+
+                    <div>
+
+                      <button
+                        type="button"
+                        onClick={selectAllStudents}
+                      >
+                        Select All
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={clearSelectedStudents}
+                      >
+                        Clear
+                      </button>
+
+                    </div>
+
+                  </div>
+
+
+                  <p className="snm-selected-count">
+                    {selectedStudentIds.length} students selected
+                  </p>
+
+
+                  {eligibleStudents.length === 0 ? (
+
+                    <div className="snm-empty-students">
+                      No students are enrolled in this subject.
+                      Please assign the subject through Subject
+                      Management first.
+                    </div>
+
+                  ) : (
+
+                    <div className="snm-student-checkbox-list">
+
+                      {eligibleStudents.map((student) => (
+
+                        <label
+                          key={student.id}
+                          className="snm-student-checkbox"
+                        >
+
+                          <input
+                            type="checkbox"
+                            checked={selectedStudentIds.includes(
+                              String(student.id)
+                            )}
+                            onChange={() =>
+                              toggleStudent(student.id)
+                            }
+                          />
+
+                          <span>
+                            👩‍🎓 {student.full_name}
+                          </span>
+
+                        </label>
+
+                      ))}
+
+                    </div>
+
+                  )}
+
+                </div>
+
+              )}
+
+            </div>
+
+
             {/* FILE UPLOAD */}
 
             <div className="snm-field">
@@ -702,8 +976,8 @@ function SubjectNotesManagement() {
                   </strong>
 
                   <p>
-                    PDF, Word, PowerPoint, Excel, text or image
-                    • Max 50 MB
+                    PDF, Word, PowerPoint, Excel, text or image.
+                    Maximum 50 MB.
                   </p>
 
                   <input
@@ -721,18 +995,7 @@ function SubjectNotesManagement() {
                   {selectedFile && (
 
                     <small className="snm-selected-file">
-
                       Selected: {selectedFile.name}
-
-                      {" ("}
-
-                      {(
-                        selectedFile.size /
-                        (1024 * 1024)
-                      ).toFixed(2)}
-
-                      {" MB)"}
-
                     </small>
 
                   )}
@@ -762,12 +1025,19 @@ function SubjectNotesManagement() {
                 disabled={
                   saving ||
                   loading ||
-                  subjects.length === 0
+                  subjects.length === 0 ||
+                  (
+                    sharingMode === "selected" &&
+                    (
+                      selectedStudentIds.length === 0 ||
+                      eligibleStudents.length === 0
+                    )
+                  )
                 }
               >
 
                 {saving
-                  ? "Saving..."
+                  ? "⏳ Saving..."
                   : editingNote
                     ? "💾 Update Material"
                     : "✨ Upload Material"}
@@ -797,7 +1067,7 @@ function SubjectNotesManagement() {
       </div>
 
 
-      {/* UPLOADED STUDY MATERIALS */}
+      {/* UPLOADED NOTES */}
 
       <div className="snm-panel snm-library-panel">
 
@@ -808,15 +1078,11 @@ function SubjectNotesManagement() {
           </span>
 
           <div>
-
-            <h3>
-              Uploaded Study Materials
-            </h3>
+            <h3>Uploaded Study Materials</h3>
 
             <p>
-              Browse materials grouped by subject.
+              Browse learning materials grouped by subject.
             </p>
-
           </div>
 
           <span className="snm-count">
@@ -825,8 +1091,6 @@ function SubjectNotesManagement() {
 
         </div>
 
-
-        {/* LOADING */}
 
         {loading ? (
 
@@ -837,18 +1101,11 @@ function SubjectNotesManagement() {
         ) : notes.length === 0 ? (
 
           <div className="snm-empty">
-
             <span>🌷</span>
-
-            <h4>
-              No materials uploaded yet
-            </h4>
-
+            <h4>No materials uploaded yet</h4>
             <p>
-              Uploaded notes will appear here,
-              organised by subject.
+              Uploaded notes will appear here.
             </p>
-
           </div>
 
         ) : (
@@ -862,34 +1119,22 @@ function SubjectNotesManagement() {
                 key={subject.id}
               >
 
-                {/* SUBJECT HEADING */}
-
                 <summary>
 
                   <div>
-
                     <strong>
                       {subject.subject_name}
                     </strong>
 
                     <small>
-
-                      {subject.notes.length}{" "}
-
-                      {subject.notes.length === 1
-                        ? "file"
-                        : "files"}
-
+                      {subject.notes.length} files
                     </small>
-
                   </div>
 
                   <span>⌄</span>
 
                 </summary>
 
-
-                {/* NO NOTES */}
 
                 {subject.notes.length === 0 ? (
 
@@ -898,8 +1143,6 @@ function SubjectNotesManagement() {
                   </p>
 
                 ) : (
-
-                  /* NOTES LIST */
 
                   <div className="snm-note-list">
 
@@ -915,36 +1158,30 @@ function SubjectNotesManagement() {
                         </div>
 
 
-                        {/* NOTE INFORMATION */}
-
                         <div className="snm-note-info">
 
-                          <strong>
-                            {note.title}
-                          </strong>
+                          <strong>{note.title}</strong>
 
                           {note.description && (
                             <p>{note.description}</p>
                           )}
 
                           <small>
-
                             👩‍🏫 {note.teacher_name || "Teacher"}
-
                             {" • "}
-
                             {note.file_name}
-
                             {" • "}
-
                             {formatDate(note.uploaded_at)}
+                          </small>
 
+                          <small className="snm-access-label">
+                            🔒 {note.available_to_all
+                              ? "All enrolled students"
+                              : "Selected students only"}
                           </small>
 
                         </div>
 
-
-                        {/* NOTE ACTIONS */}
 
                         <div className="snm-note-actions">
 
@@ -958,7 +1195,6 @@ function SubjectNotesManagement() {
                               : "Open"}
                           </button>
 
-
                           <button
                             type="button"
                             className="snm-edit-button"
@@ -966,7 +1202,6 @@ function SubjectNotesManagement() {
                           >
                             Edit
                           </button>
-
 
                           <button
                             type="button"
