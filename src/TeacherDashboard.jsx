@@ -10,6 +10,7 @@ import Announcements from "./Announcements";
 import CoinManagement from "./CoinManagement";
 import LeagueManagement from "./LeagueManagement";
 import TeacherSubjectManagement from "./TeacherSubjectManagement";
+import SubjectNotesManagement from "./SubjectNotesManagement";
 import "./TeacherDashboard.css";
 
 function getLocalDate() {
@@ -39,6 +40,7 @@ const teacherMenu = [
   { id: "Coin Management", icon: "🪙", label: "Coin Management" },
   { id: "League Management", icon: "🏆", label: "League Management" },
   { id: "Subject Management", icon: "📚", label: "Subject Management" },
+  { id: "Subject Notes", icon: "📖", label: "Subject Notes" },
 ];
 
 const sectionDescriptions = {
@@ -56,6 +58,7 @@ const sectionDescriptions = {
   "Coin Management": "Manage student coins and rewards.",
   "League Management": "Manage monthly student leagues.",
   "Subject Management": "Assign subjects to individual students.",
+  "Subject Notes": "Upload and manage subject-wise learning materials.",
 };
 
 function TeacherDashboard({ onLogout }) {
@@ -784,6 +787,8 @@ function TeacherDashboard({ onLogout }) {
         return <LeagueManagement />;
       case "Subject Management":
         return <TeacherSubjectManagement />;
+      case "Subject Notes":
+        return <SubjectNotesManagement />;
       default:
         return renderOverview();
     }
