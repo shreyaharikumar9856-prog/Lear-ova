@@ -1,0 +1,838 @@
+/* =========================================
+   LEARNOVA TEST MAKER
+========================================= */
+
+.test-maker {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 15px 0 40px;
+  box-sizing: border-box;
+  color: #51465c;
+}
+
+/* =========================================
+   HEADER
+========================================= */
+
+.tm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px;
+  margin-bottom: 25px;
+  border-radius: 22px;
+  background: linear-gradient(120deg, #fff0f5, #f0ebff);
+}
+
+.tm-header > div:first-child > span {
+  color: #a77ca8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+}
+
+.tm-header h2 {
+  color: #665080;
+  font-size: 27px;
+  margin: 10px 0 6px;
+}
+
+.tm-header p {
+  color: #8d8195;
+  font-size: 13px;
+  margin: 0;
+}
+
+.tm-header-icon {
+  font-size: 48px;
+}
+
+/* =========================================
+   MAIN PANEL
+========================================= */
+
+.tm-panel {
+  background: #ffffff;
+  padding: 26px;
+  border: 1px solid #f0e8f3;
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(90, 60, 100, 0.04);
+  margin-bottom: 25px;
+  min-width: 0;
+}
+
+/* =========================================
+   SECTION HEADINGS
+========================================= */
+
+.tm-section-heading {
+  margin-bottom: 25px;
+}
+
+.tm-section-heading h3 {
+  color: #725b8d;
+  font-size: 19px;
+  margin: 0 0 7px;
+}
+
+.tm-section-heading p {
+  color: #a096aa;
+  font-size: 12px;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.tm-subheading {
+  color: #765e91;
+  font-size: 15px;
+  padding: 13px 15px;
+  background: #f8f4ff;
+  border-radius: 10px;
+  margin: 25px 0 18px;
+  border-left: 4px solid #a38acb;
+}
+
+/* =========================================
+   FORM GRID
+========================================= */
+
+.tm-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.tm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  margin-bottom: 17px;
+}
+
+.tm-field label {
+  color: #655378;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* =========================================
+   INPUTS
+========================================= */
+
+.tm-field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.tm-field select,
+.tm-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid #e8def0;
+  border-radius: 10px;
+  background: #faf8ff;
+  color: #51465c;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: 0.2s ease;
+}
+
+.tm-field input::placeholder,
+.tm-field textarea::placeholder {
+  color: #b4a9bd;
+}
+
+.tm-field select option {
+  background: #ffffff;
+  color: #51465c;
+}
+
+.tm-field input:focus,
+.tm-field select:focus,
+.tm-field textarea:focus {
+  background: #ffffff;
+  border-color: #a68bd0;
+  box-shadow: 0 0 0 3px rgba(166, 139, 208, 0.12);
+}
+
+.tm-field textarea {
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.tm-field small {
+  color: #a397aa;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* =========================================
+   STUDENT SELECTION
+========================================= */
+
+.tm-student-box {
+  padding: 19px;
+  background: #faf7ff;
+  border: 1px solid #eee4f5;
+  border-radius: 13px;
+  margin-bottom: 25px;
+}
+
+.tm-student-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tm-student-heading strong {
+  color: #705b88;
+  font-size: 13px;
+}
+
+.tm-student-heading button {
+  border: none;
+  background: #eee6fb;
+  color: #765e99;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-left: 5px;
+}
+
+.tm-student-heading button:hover {
+  background: #e3d7f3;
+}
+
+.tm-student-box > p {
+  color: #9279b0;
+  font-size: 11px;
+  font-weight: 700;
+  margin: 14px 0;
+}
+
+.tm-student-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tm-student-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px;
+  background: #ffffff;
+  border: 1px solid #eee5f3;
+  border-radius: 9px;
+  color: #66527f;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tm-student-option input {
+  accent-color: #8973b5;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* =========================================
+   EXTRA TEST SETTINGS
+========================================= */
+
+.tm-extra-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 17px;
+  margin: 18px 0;
+  background: #fcfaff;
+  border: 1px solid #eee5f3;
+  border-radius: 12px;
+}
+
+.tm-extra-settings > label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #705b88;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tm-extra-settings input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: #8973b5;
+  cursor: pointer;
+}
+
+.tm-attempt-field {
+  max-width: 200px;
+  margin-left: 27px;
+}
+
+.tm-total-marks {
+  padding: 12px 14px;
+  background: #f1edff;
+  border: 1px solid #e5dcf5;
+  border-radius: 10px;
+  color: #745c98;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+/* =========================================
+   QUESTION SECTION
+========================================= */
+
+.tm-question-section {
+  margin-top: 30px;
+}
+
+.tm-question-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.tm-question-section-heading h3 {
+  color: #725b8d;
+  font-size: 19px;
+  margin: 0 0 6px;
+}
+
+.tm-question-section-heading p {
+  color: #a096aa;
+  font-size: 12px;
+  margin: 0;
+}
+
+.tm-question-section-heading > span {
+  background: #f0eaff;
+  color: #8065a6;
+  padding: 8px 13px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* =========================================
+   QUESTION CARDS
+========================================= */
+
+.tm-question-card {
+  padding: 21px;
+  margin-bottom: 18px;
+  background: #fcfaff;
+  border: 1px solid #eae1f1;
+  border-radius: 15px;
+  min-width: 0;
+}
+
+.tm-question-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.tm-question-heading h3 {
+  color: #725b8d;
+  font-size: 16px;
+  margin: 0;
+}
+
+.tm-delete-question {
+  background: #fdebed;
+  color: #bd6577;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tm-delete-question:hover {
+  background: #f9dadd;
+}
+
+/* =========================================
+   MARK SETTINGS
+========================================= */
+
+.tm-mark-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+
+/* =========================================
+   QUESTION ANSWERS
+========================================= */
+
+.tm-question-answer-area {
+  padding: 17px;
+  margin-top: 10px;
+  background: #f7f3ff;
+  border: 1px solid #e8def4;
+  border-radius: 12px;
+}
+
+.tm-question-answer-area h4 {
+  color: #705987;
+  font-size: 13px;
+  margin: 0 0 7px;
+}
+
+.tm-question-answer-area > p {
+  color: #9e91a8;
+  font-size: 11px;
+  margin: 0 0 15px;
+  line-height: 1.5;
+}
+
+/* =========================================
+   MCQ OPTIONS
+========================================= */
+
+.tm-option-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 11px;
+  min-width: 0;
+}
+
+.tm-option-letter {
+  width: 31px;
+  height: 31px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ece4fb;
+  color: #765e99;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.tm-option-row > input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #e6dced;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #51465c;
+  font-size: 12px;
+}
+
+.tm-option-row > input[type="radio"],
+.tm-option-row > input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: #8973b5;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.tm-option-row > button,
+.tm-matching-row > button {
+  border: none;
+  background: #fdebed;
+  color: #bd6577;
+  width: 27px;
+  height: 27px;
+  border-radius: 7px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* =========================================
+   SECONDARY BUTTONS
+========================================= */
+
+.tm-secondary-button {
+  border: none;
+  background: #eae2f8;
+  color: #765e99;
+  padding: 9px 14px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 5px;
+}
+
+.tm-secondary-button:hover {
+  background: #ded2f1;
+}
+
+/* =========================================
+   MATCHING QUESTIONS
+========================================= */
+
+.tm-matching-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 25px minmax(0, 1fr) 27px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tm-matching-row input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #e6dced;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #51465c;
+  font-size: 12px;
+}
+
+.tm-matching-row > span {
+  text-align: center;
+  color: #9279b0;
+  font-weight: 800;
+}
+
+/* =========================================
+   ADD QUESTION
+========================================= */
+
+.tm-add-question {
+  width: 100%;
+  padding: 15px;
+  margin-top: 5px;
+  background: #f7f2ff;
+  color: #795f9e;
+  border: 1px dashed #b9a3d7;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.tm-add-question:hover {
+  background: #eee6fc;
+  border-color: #9276b9;
+}
+
+/* =========================================
+   FINAL SUMMARY
+========================================= */
+
+.tm-final-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 13px;
+  padding: 19px;
+  margin: 25px 0;
+  background: linear-gradient(120deg, #f8f3ff, #fff2f7);
+  border: 1px solid #ede1f3;
+  border-radius: 13px;
+}
+
+.tm-final-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  text-align: center;
+}
+
+.tm-final-summary span {
+  color: #a096aa;
+  font-size: 11px;
+}
+
+.tm-final-summary strong {
+  color: #725b8d;
+  font-size: 21px;
+}
+
+/* =========================================
+   CREATE TEST BUTTON
+========================================= */
+
+.tm-create-button {
+  width: 100%;
+  padding: 15px 20px;
+  background: linear-gradient(120deg, #8972bc, #725da6);
+  color: #ffffff;
+  border: none;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(120, 90, 160, 0.15);
+  transition: 0.2s ease;
+}
+
+.tm-create-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(120, 90, 160, 0.2);
+}
+
+.tm-create-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* =========================================
+   EXISTING TESTS
+========================================= */
+
+.tm-existing-tests {
+  margin-top: 25px;
+}
+
+.tm-test-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tm-test-card {
+  padding: 20px;
+  background: #fcfaff;
+  border: 1px solid #eee5f3;
+  border-radius: 14px;
+  transition: 0.2s ease;
+  min-width: 0;
+}
+
+.tm-test-card:hover {
+  border-color: #d9c9ed;
+  box-shadow: 0 4px 12px rgba(100, 70, 130, 0.05);
+}
+
+.tm-test-card h3 {
+  color: #67517f;
+  font-size: 16px;
+  margin: 10px 0;
+}
+
+.tm-test-card p {
+  color: #98899f;
+  font-size: 12px;
+  margin: 5px 0;
+}
+
+.tm-test-details {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  margin: 16px 0 10px;
+  padding: 12px 0;
+  border-top: 1px solid #eee5f3;
+  border-bottom: 1px solid #eee5f3;
+}
+
+.tm-test-details span {
+  color: #806b95;
+  font-size: 11px;
+}
+
+.tm-test-card > small {
+  color: #a397aa;
+  font-size: 10px;
+}
+
+/* =========================================
+   STATUS BADGES
+========================================= */
+
+.tm-status {
+  display: inline-block;
+  padding: 6px 11px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.tm-draft {
+  background: #fff3da;
+  color: #aa8741;
+}
+
+.tm-published {
+  background: #e7f7eb;
+  color: #43845d;
+}
+
+.tm-archived {
+  background: #eeeaf2;
+  color: #887d92;
+}
+
+/* =========================================
+   EMPTY STATES
+========================================= */
+
+.tm-empty {
+  text-align: center;
+  padding: 40px 20px;
+  background: #fcfaff;
+  border: 1px dashed #e7dced;
+  border-radius: 15px;
+  color: #a397aa;
+  font-size: 35px;
+}
+
+.tm-empty h3 {
+  color: #755f8b;
+  font-size: 17px;
+}
+
+.tm-empty p {
+  color: #a397aa;
+  font-size: 12px;
+}
+
+/* =========================================
+   MESSAGE BOXES
+========================================= */
+
+.tm-message {
+  padding: 13px 16px;
+  margin-bottom: 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.tm-success {
+  background: #eaf8ef;
+  color: #398357;
+  border: 1px solid #d1efdc;
+}
+
+.tm-error {
+  background: #fff0f1;
+  color: #bf5364;
+  border: 1px solid #f7d6dc;
+}
+
+/* =========================================
+   MOBILE RESPONSIVENESS
+========================================= */
+
+@media (max-width: 700px) {
+
+  .test-maker {
+    padding: 10px 0 30px;
+  }
+
+  .tm-header {
+    padding: 20px;
+  }
+
+  .tm-header h2 {
+    font-size: 21px;
+  }
+
+  .tm-header-icon {
+    font-size: 35px;
+  }
+
+  .tm-panel {
+    padding: 17px;
+  }
+
+  .tm-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .tm-student-list {
+    grid-template-columns: 1fr;
+  }
+
+  .tm-final-summary {
+    gap: 8px;
+    padding: 14px 8px;
+  }
+
+  .tm-final-summary span {
+    font-size: 10px;
+  }
+
+  .tm-final-summary strong {
+    font-size: 18px;
+  }
+
+  .tm-question-card {
+    padding: 15px;
+  }
+
+  .tm-question-section-heading h3 {
+    font-size: 17px;
+  }
+
+}
+
+@media (max-width: 450px) {
+
+  .tm-header {
+    padding: 16px;
+  }
+
+  .tm-header h2 {
+    font-size: 19px;
+  }
+
+  .tm-mark-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .tm-matching-row {
+    grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr) 25px;
+    gap: 5px;
+  }
+
+  .tm-matching-row input {
+    padding: 8px;
+    font-size: 11px;
+  }
+
+  .tm-question-heading {
+    align-items: flex-start;
+  }
+
+  .tm-delete-question {
+    font-size: 10px;
+    padding: 7px 9px;
+  }
+
+}
+
+/* =========================================
+   ACCESSIBILITY
+========================================= */
+
+.tm-student-option input:focus-visible,
+.tm-extra-settings input:focus-visible,
+.tm-question-card button:focus-visible,
+.tm-create-button:focus-visible {
+  outline: 3px solid rgba(137, 115, 181, 0.3);
+  outline-offset: 3px;
+}
