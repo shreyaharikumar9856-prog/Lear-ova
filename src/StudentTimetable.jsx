@@ -18,18 +18,19 @@ function StudentTimetable() {
     "Sunday",
   ];
 
-  // Format time into 5:00 PM
+  // Format time into 12-hour AM/PM format
   const formatTime = (time) => {
     if (!time) return "";
 
     const [hours, minutes] = time.split(":");
+
     const date = new Date();
+    date.setHours(Number(hours), Number(minutes), 0, 0);
 
-    date.setHours(Number(hours), Number(minutes), 0);
-
-    return date.toLocaleTimeString([], {
+    return date.toLocaleTimeString("en-US", {
       hour: "numeric",
       minute: "2-digit",
+      hour12: true,
     });
   };
 
@@ -52,15 +53,18 @@ function StudentTimetable() {
         if (authError) throw authError;
 
         if (!user) {
-          throw new Error("Please log in to view your timetable.");
+          throw new Error(
+            "Please log in to view your timetable."
+          );
         }
 
         // Find student record
-        const { data: student, error: studentError } = await supabase
-          .from("students")
-          .select("id, full_name")
-          .eq("user_id", user.id)
-          .maybeSingle();
+        const { data: student, error: studentError } =
+          await supabase
+            .from("students")
+            .select("id, full_name")
+            .eq("user_id", user.id)
+            .maybeSingle();
 
         if (studentError) throw studentError;
 
@@ -72,28 +76,36 @@ function StudentTimetable() {
 
         setStudentName(student.full_name || "Student");
 
-        // Fetch only this student's classes
+        // Fetch individual classes AND all-student classes
         const fetchClasses = async () => {
-          const { data, error: timetableError } = await supabase
-            .from("timetable")
-            .select("*")
-            .eq("student_id", student.id);
+          const { data, error: timetableError } =
+            await supabase
+              .from("timetable")
+              .select("*")
+              .or(
+                `student_id.eq.${student.id},student_id.is.null`
+              );
 
           if (timetableError) throw timetableError;
 
           if (cancelled) return;
 
-          const sortedClasses = (data || []).sort((a, b) => {
-            const dayDifference =
-              days.indexOf(a.day_of_week) -
-              days.indexOf(b.day_of_week);
+          // Sort by weekday and starting time
+          const sortedClasses = (data || []).sort(
+            (a, b) => {
+              const dayDifference =
+                days.indexOf(a.day_of_week) -
+                days.indexOf(b.day_of_week);
 
-            if (dayDifference !== 0) return dayDifference;
+              if (dayDifference !== 0) {
+                return dayDifference;
+              }
 
-            return (a.start_time || "").localeCompare(
-              b.start_time || ""
-            );
-          });
+              return (a.start_time || "").localeCompare(
+                b.start_time || ""
+              );
+            }
+          );
 
           setClasses(sortedClasses);
         };
@@ -111,19 +123,31 @@ function StudentTimetable() {
               event: "*",
               schema: "public",
               table: "timetable",
-              filter: `student_id=eq.${student.id}`,
             },
             () => {
               fetchClasses().catch((err) => {
-                console.error("Timetable refresh error:", err);
+                console.error(
+                  "Timetable refresh error:",
+                  err
+                );
+
+                if (!cancelled) {
+                  setError(
+                    "Unable to refresh your timetable. Please reload the page."
+                  );
+                }
               });
             }
           )
           .subscribe();
+
       } catch (err) {
         if (!cancelled) {
           console.error("Timetable error:", err);
-          setError(err.message || "Unable to load timetable.");
+
+          setError(
+            err.message || "Unable to load timetable."
+          );
         }
       } finally {
         if (!cancelled) {
@@ -143,6 +167,7 @@ function StudentTimetable() {
     };
   }, []);
 
+  // Loading screen
   if (loading) {
     return (
       <div className="timetable-loading">
@@ -152,21 +177,32 @@ function StudentTimetable() {
     );
   }
 
+  // Error screen
   if (error) {
     return (
       <div className="timetable-empty">
-        <div className="timetable-empty-icon">⚠️</div>
+        <div className="timetable-empty-icon">
+          ⚠️
+        </div>
+
         <h2>Something went wrong</h2>
         <p>{error}</p>
       </div>
     );
   }
 
+  // Summary calculations
+  const activeDays = new Set(
+    classes.map((item) => item.day_of_week)
+  ).size;
+
   return (
     <div className="student-timetable">
 
-      {/* Header */}
+      {/* HEADER */}
+
       <div className="timetable-header">
+
         <div>
           <span className="timetable-tag">
             YOUR WEEKLY LEARNING PLAN 🌷
@@ -182,12 +218,16 @@ function StudentTimetable() {
         <div className="timetable-header-icon">
           🗓️
         </div>
+
       </div>
 
-      {/* Summary */}
+      {/* SUMMARY */}
+
       <div className="timetable-summary">
+
         <div className="timetable-summary-card">
           <span>📚</span>
+
           <div>
             <h3>{classes.length}</h3>
             <p>Total classes</p>
@@ -196,83 +236,134 @@ function StudentTimetable() {
 
         <div className="timetable-summary-card">
           <span>📅</span>
+
           <div>
-            <h3>
-              {new Set(classes.map((item) => item.day_of_week)).size}
-            </h3>
+            <h3>{activeDays}</h3>
             <p>Active days</p>
           </div>
         </div>
+
       </div>
 
-      {/* Empty state */}
+      {/* EMPTY STATE */}
+
       {classes.length === 0 ? (
+
         <div className="timetable-empty">
-          <div className="timetable-empty-icon">🌼</div>
+
+          <div className="timetable-empty-icon">
+            🌼
+          </div>
 
           <h2>No classes scheduled yet!</h2>
 
           <p>
-            Your teacher hasn't assigned any classes to your timetable.
-            Check back soon!
+            Your teachers haven't assigned any classes
+            to your timetable. Check back soon!
           </p>
+
         </div>
+
       ) : (
+
+        /* WEEKLY TIMETABLE */
+
         <div className="weekly-timetable">
 
           {days.map((day) => {
+
             const dayClasses = classes.filter(
               (item) => item.day_of_week === day
             );
 
             return (
-              <div className="timetable-day" key={day}>
+
+              <div
+                className="timetable-day"
+                key={day}
+              >
+
+                {/* DAY HEADING */}
 
                 <div className="timetable-day-heading">
-                  <div className="day-icon">📅</div>
+
+                  <div className="day-icon">
+                    📅
+                  </div>
+
                   <h3>{day}</h3>
+
                   <span>
                     {dayClasses.length}{" "}
-                    {dayClasses.length === 1 ? "class" : "classes"}
+                    {dayClasses.length === 1
+                      ? "class"
+                      : "classes"}
                   </span>
+
                 </div>
 
+                {/* NO CLASS */}
+
                 {dayClasses.length === 0 ? (
+
                   <p className="no-class-text">
                     No classes scheduled
                   </p>
+
                 ) : (
+
+                  /* CLASS CARDS */
+
                   <div className="day-class-list">
+
                     {dayClasses.map((item) => (
+
                       <div
                         className="timetable-class-card"
                         key={item.id}
                       >
+
+                        {/* CLASS TIME */}
+
                         <div className="class-time">
+
                           <strong>
                             {formatTime(item.start_time)}
                           </strong>
 
                           <span>
-                            {formatTime(item.end_time)}
+                            Until {formatTime(item.end_time)}
                           </span>
+
                         </div>
 
+                        {/* CLASS DETAILS */}
+
                         <div className="class-details">
+
                           <h4>{item.subject}</h4>
 
-                          <p>
-                            👩‍🏫 {item.teacher_name || "Teacher"}
-                          </p>
+                          {/* TEACHER NAME */}
+
+                          <span className="class-teacher">
+                            👩‍🏫{" "}
+                            {item.teacher_name || "Teacher"}
+                          </span>
+
+                          {/* NOTES */}
 
                           {item.notes && (
                             <p className="class-notes">
                               📝 {item.notes}
                             </p>
                           )}
+
                         </div>
 
+                        {/* MEETING LINK */}
+
                         {item.meeting_link && (
+
                           <a
                             href={item.meeting_link}
                             target="_blank"
@@ -281,17 +372,27 @@ function StudentTimetable() {
                           >
                             Join Class ↗
                           </a>
+
                         )}
+
                       </div>
+
                     ))}
+
                   </div>
+
                 )}
+
               </div>
+
             );
+
           })}
 
         </div>
+
       )}
+
     </div>
   );
 }
