@@ -196,3 +196,168 @@
     width: 100%;
   }
 }
+/* SUBJECT CARD BUTTON */
+
+.subject-card-open-button {
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  padding: 0;
+}
+
+.student-subject-card {
+  overflow: hidden;
+}
+
+.subject-card-open-button .subject-card-icon {
+  margin-bottom: 12px;
+}
+
+/* EXPANDED SUBJECT */
+
+.subject-card-expanded {
+  border-color: #d9c6eb;
+  box-shadow: 0 5px 18px rgba(120, 90, 150, 0.08);
+}
+
+/* NOTES SECTION */
+
+.subject-notes-panel {
+  margin-top: 18px;
+  padding: 17px 0 0;
+  border-top: 1px solid #f0e5f1;
+  text-align: left;
+}
+
+.subject-notes-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 16px;
+}
+
+.subject-notes-heading > span {
+  font-size: 25px;
+}
+
+.subject-notes-heading h4 {
+  margin: 0;
+  color: #725b84;
+  font-size: 14px;
+}
+
+.subject-notes-heading p {
+  margin: 5px 0 0;
+  color: #a397aa;
+  font-size: 11px;
+}
+
+/* NOTES LIST */
+
+.subject-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.subject-note-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: #fcf9ff;
+  border: 1px solid #eee4f3;
+  border-radius: 11px;
+  min-width: 0;
+}
+
+.subject-note-icon {
+  font-size: 23px;
+}
+
+.subject-note-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.subject-note-details h5 {
+  margin: 0 0 5px;
+  color: #66527f;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.subject-note-details p {
+  color: #95889e;
+  font-size: 11px;
+  margin: 0 0 5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.subject-note-details small {
+  color: #aa9bb1;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.subject-note-open-button {
+  background: #8973b5;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 11px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.subject-note-open-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* EMPTY NOTES */
+
+.subject-notes-empty {
+  text-align: center;
+  padding: 20px 10px;
+  background: #fcf9fd;
+  border-radius: 12px;
+}
+
+.subject-notes-empty span {
+  font-size: 27px;
+}
+
+.subject-notes-empty p {
+  color: #8c7998;
+  font-size: 12px;
+}
+
+.subject-notes-empty small {
+  color: #a69aaa;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* MOBILE */
+
+@media (max-width: 500px) {
+  .subject-note-card {
+    flex-wrap: wrap;
+  }
+
+  .subject-note-details {
+    flex-basis: calc(100% - 45px);
+  }
+
+  .subject-note-open-button {
+    margin-left: auto;
+  }
+}
