@@ -637,3 +637,151 @@
   }
 
 }
+/* =====================================
+   STUDENT-SPECIFIC SHARING
+===================================== */
+
+.snm-sharing-section {
+  padding: 20px;
+  background: #faf7ff;
+  border: 1px solid #eee4f5;
+  border-radius: 14px;
+}
+
+.snm-sharing-section h4 {
+  color: #725b8d;
+  font-size: 15px;
+  margin: 0 0 6px;
+}
+
+.snm-sharing-section > p {
+  color: #a096aa;
+  font-size: 12px;
+  margin-bottom: 17px;
+}
+
+.snm-sharing-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  margin-top: 10px;
+  background: #ffffff;
+  border: 1px solid #eee5f3;
+  border-radius: 11px;
+  cursor: pointer;
+}
+
+.snm-sharing-option input {
+  width: 17px;
+  height: 17px;
+  margin-top: 2px;
+  accent-color: #8973b5;
+  flex-shrink: 0;
+}
+
+.snm-sharing-option strong {
+  display: block;
+  color: #66527f;
+  font-size: 13px;
+}
+
+.snm-sharing-option small {
+  display: block;
+  color: #a397aa;
+  font-size: 11px;
+  margin-top: 5px;
+  line-height: 1.5;
+}
+
+.snm-student-selection {
+  margin-top: 17px;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #e9def3;
+  border-radius: 12px;
+}
+
+.snm-student-selection-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.snm-student-selection-heading strong {
+  color: #705b88;
+  font-size: 13px;
+}
+
+.snm-student-selection-heading button {
+  border: none;
+  background: #eee6fb;
+  color: #765e99;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-left: 5px;
+}
+
+.snm-selected-count {
+  font-size: 11px;
+  color: #9279b0;
+  margin: 12px 0;
+  font-weight: 700;
+}
+
+.snm-student-checkbox-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.snm-student-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px;
+  background: #fcfaff;
+  border: 1px solid #efe7f4;
+  border-radius: 9px;
+  cursor: pointer;
+  color: #66527f;
+  font-size: 12px;
+}
+
+.snm-student-checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: #8973b5;
+  flex-shrink: 0;
+}
+
+.snm-empty-students {
+  padding: 15px;
+  background: #fff6f6;
+  border-radius: 9px;
+  color: #b56d7b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.snm-access-label {
+  display: block;
+  margin-top: 6px;
+  color: #8b70aa !important;
+  font-weight: 700;
+}
+
+@media (max-width: 500px) {
+  .snm-student-checkbox-list {
+    grid-template-columns: 1fr;
+  }
+
+  .snm-sharing-section {
+    padding: 14px;
+  }
+}
