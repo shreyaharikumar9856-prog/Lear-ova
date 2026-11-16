@@ -1,3 +1,4 @@
+?variant="standard" title="Complete HomeworkManagement.jsx" id="62841"}
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import "./HomeworkManagement.css";
@@ -14,13 +15,18 @@ function HomeworkManagement() {
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [studentId, setStudentId] = useState("all");
+  const [teacherName, setTeacherName] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
+
+  const [teacherFilter, setTeacherFilter] = useState("all");
 
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // LOAD STUDENTS AND ASSIGNMENTS
+  // =====================================
+  // LOAD STUDENTS AND HOMEWORK
+  // =====================================
 
   async function loadData() {
     setLoading(true);
@@ -36,7 +42,7 @@ function HomeworkManagement() {
           supabase
             .from("assignments")
             .select(
-              "id, student_id, title, subject, description, due_date, assigned_at, attachment_path, status"
+              "id, student_id, title, subject, description, due_date, assigned_at, attachment_path, status, teacher_name"
             )
             .order("assigned_at", { ascending: false }),
         ]);
@@ -68,7 +74,9 @@ function HomeworkManagement() {
     loadData();
   }, []);
 
+  // =====================================
   // UPLOAD ATTACHMENT
+  // =====================================
 
   async function uploadAttachment(file) {
     const safeName = file.name.replace(
@@ -95,7 +103,9 @@ function HomeworkManagement() {
     return filePath;
   }
 
-  // CREATE HOMEWORK
+  // =====================================
+  // CREATE AND ASSIGN HOMEWORK
+  // =====================================
 
   async function createHomework(event) {
     event.preventDefault();
@@ -108,6 +118,11 @@ function HomeworkManagement() {
     try {
       if (!title.trim()) {
         setMessage("Please enter a homework title.");
+        return;
+      }
+
+      if (!teacherName.trim()) {
+        setMessage("Please enter the teacher's name.");
         return;
       }
 
@@ -136,13 +151,13 @@ function HomeworkManagement() {
         return;
       }
 
-      // Upload attachment once
+      // Upload attachment once for all selected students
 
       if (selectedFile) {
         uploadedPath = await uploadAttachment(selectedFile);
       }
 
-      // Create assignment for selected students
+      // Prepare assignment records
 
       const rows = selectedStudents.map((student) => ({
         student_id: student.id,
@@ -152,6 +167,7 @@ function HomeworkManagement() {
         due_date: dueDate || null,
         status: "Assigned",
         attachment_path: uploadedPath,
+        teacher_name: teacherName.trim(),
       }));
 
       const { error } = await supabase
@@ -159,8 +175,7 @@ function HomeworkManagement() {
         .insert(rows);
 
       if (error) {
-
-        // Remove unused attachment if assignment fails
+        // Remove uploaded file if assignment creation fails
 
         if (uploadedPath) {
           const { error: removeError } =
@@ -183,13 +198,14 @@ function HomeworkManagement() {
         return;
       }
 
-      // RESET FORM
+      // Reset form
 
       setTitle("");
       setSubject("Mathematics");
       setDescription("");
       setDueDate("");
       setStudentId("all");
+      setTeacherName("");
       setSelectedFile(null);
 
       const fileInput = document.getElementById(
@@ -199,6 +215,8 @@ function HomeworkManagement() {
       if (fileInput) {
         fileInput.value = "";
       }
+
+      // Refresh homework list
 
       await loadData();
 
@@ -213,7 +231,9 @@ function HomeworkManagement() {
     }
   }
 
+  // =====================================
   // OPEN ATTACHMENT
+  // =====================================
 
   async function openAttachment(filePath) {
     setMessage("");
@@ -236,30 +256,73 @@ function HomeworkManagement() {
     );
   }
 
-  // GET STUDENT NAME
-
-  function getStudentName(studentId) {
-    const student = students.find(
-      (student) =>
-        String(student.id) === String(studentId)
-    );
-
-    return student?.full_name || "Student";
-  }
-
+  // =====================================
   // FORMAT DATE
+  // =====================================
 
   function formatDate(date) {
     if (!date) return "No deadline";
 
-    return new Date(
-      `${date}T00:00:00`
-    ).toLocaleDateString("en-US", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
+    return new Date(`${date}T00:00:00`).toLocaleDateString(
+      "en-US",
+      {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }
+    );
   }
+
+  // =====================================
+  // TEACHER FILTER
+  // =====================================
+
+  const teacherNames = [
+    ...new Set(
+      assignments
+        .map((assignment) => assignment.teacher_name?.trim())
+        .filter(Boolean)
+    ),
+  ].sort();
+
+  const visibleAssignments = assignments.filter(
+    (assignment) => {
+      if (teacherFilter === "all") {
+        return true;
+      }
+
+      if (teacherFilter === "__unassigned__") {
+        return !assignment.teacher_name?.trim();
+      }
+
+      return (
+        assignment.teacher_name?.trim() === teacherFilter
+      );
+    }
+  );
+
+  // =====================================
+  // GROUP HOMEWORK BY STUDENT
+  // =====================================
+
+  const studentGroups = students
+    .map((student) => ({
+      ...student,
+
+      homework: visibleAssignments.filter(
+        (assignment) =>
+          String(assignment.student_id) === String(student.id)
+      ),
+    }))
+    .filter(
+      (student) =>
+        teacherFilter === "all" ||
+        student.homework.length > 0
+    );
+
+  // =====================================
+  // MAIN PAGE
+  // =====================================
 
   return (
     <section className="homework-management">
@@ -300,7 +363,9 @@ function HomeworkManagement() {
 
           <div>
             <h3>Create New Homework</h3>
-            <p>Fill in the details below to assign homework.</p>
+            <p>
+              Fill in the details below to assign homework.
+            </p>
           </div>
 
         </div>
@@ -311,7 +376,29 @@ function HomeworkManagement() {
           className="homework-form"
         >
 
-          {/* ASSIGNMENT TITLE */}
+          {/* TEACHER NAME */}
+
+          <div className="homework-field homework-full-width">
+
+            <label htmlFor="homework-teacher">
+              Teacher Name *
+            </label>
+
+            <input
+              id="homework-teacher"
+              type="text"
+              value={teacherName}
+              onChange={(event) =>
+                setTeacherName(event.target.value)
+              }
+              placeholder="Enter teacher name"
+              required
+            />
+
+          </div>
+
+
+          {/* HOMEWORK TITLE */}
 
           <div className="homework-field homework-full-width">
 
@@ -426,7 +513,7 @@ function HomeworkManagement() {
           </div>
 
 
-          {/* DEADLINE */}
+          {/* DUE DATE */}
 
           <div className="homework-field homework-full-width">
 
@@ -446,7 +533,7 @@ function HomeworkManagement() {
           </div>
 
 
-          {/* ATTACHMENT */}
+          {/* FILE UPLOAD */}
 
           <div className="homework-field homework-full-width">
 
@@ -489,7 +576,9 @@ function HomeworkManagement() {
                 />
 
                 {selectedFile && (
+
                   <div className="homework-selected-file">
+
                     ✅ {selectedFile.name}
 
                     <span>
@@ -509,13 +598,17 @@ function HomeworkManagement() {
                           "homework-attachment"
                         );
 
-                        if (input) input.value = "";
+                        if (input) {
+                          input.value = "";
+                        }
                       }}
                       aria-label="Remove selected file"
                     >
                       ✕
                     </button>
+
                   </div>
+
                 )}
 
               </div>
@@ -532,6 +625,7 @@ function HomeworkManagement() {
           {/* MESSAGE */}
 
           {message && (
+
             <div
               className={`homework-message ${
                 message.toLowerCase().includes("success")
@@ -543,10 +637,11 @@ function HomeworkManagement() {
             >
               {message}
             </div>
+
           )}
 
 
-          {/* SUBMIT BUTTON */}
+          {/* ASSIGN BUTTON */}
 
           <div className="homework-submit-area">
 
@@ -569,7 +664,9 @@ function HomeworkManagement() {
       </div>
 
 
-      {/* ASSIGNED HOMEWORK */}
+      {/* =====================================
+          ASSIGNED HOMEWORK SECTION
+      ===================================== */}
 
       <div className="homework-assigned-section">
 
@@ -583,16 +680,62 @@ function HomeworkManagement() {
             <h3>Assigned Homework</h3>
 
             <p>
-              View all homework assignments given to students.
+              View homework organised by student and teacher.
             </p>
           </div>
 
           <span className="homework-count">
-            {assignments.length} Assignments
+            {visibleAssignments.length} Assignments
           </span>
 
         </div>
 
+
+        {/* TEACHER FILTER */}
+
+        <div className="homework-filter-toolbar">
+
+          <div className="homework-filter-control">
+
+            <label htmlFor="teacher-filter">
+              👩‍🏫 Filter by Teacher
+            </label>
+
+            <select
+              id="teacher-filter"
+              value={teacherFilter}
+              onChange={(event) =>
+                setTeacherFilter(event.target.value)
+              }
+            >
+
+              <option value="all">
+                All Teachers
+              </option>
+
+              <option value="__unassigned__">
+                Teacher Not Recorded
+              </option>
+
+              {teacherNames.map((teacher) => (
+
+                <option
+                  key={teacher}
+                  value={teacher}
+                >
+                  {teacher}
+                </option>
+
+              ))}
+
+            </select>
+
+          </div>
+
+        </div>
+
+
+        {/* LOADING */}
 
         {loading ? (
 
@@ -600,126 +743,197 @@ function HomeworkManagement() {
             Loading homework...
           </div>
 
-        ) : assignments.length === 0 ? (
+        ) : students.length === 0 ? (
 
           <div className="homework-no-assignments">
-
             <div>🌷</div>
+            <h3>No students registered</h3>
+          </div>
 
-            <h3>No homework assigned yet</h3>
+        ) : studentGroups.length === 0 ? (
 
+          <div className="homework-no-assignments">
+            <div>🌼</div>
+            <h3>No assignments found</h3>
             <p>
-              Your assignments will appear here once you
-              create them.
+              No homework is available for this teacher.
             </p>
-
           </div>
 
         ) : (
 
-          <div className="homework-list">
+          /* STUDENT GROUPS */
 
-            {assignments.map((assignment) => {
+          <div className="homework-student-groups">
 
-              const assignedStudent = getStudentName(
-                assignment.student_id
-              );
+            {studentGroups.map((student) => (
 
-              return (
+              <details
+                className="homework-student-group"
+                key={student.id}
+              >
 
-                <article
-                  className="homework-card"
-                  key={assignment.id}
-                >
+                {/* STUDENT NAME */}
 
-                  {/* CARD HEADER */}
+                <summary className="homework-student-summary">
 
-                  <div className="homework-card-header">
+                  <div className="homework-student-info">
 
-                    <div>
-                      <span className="homework-card-subject">
-                        {assignment.subject || "Subject"}
-                      </span>
-
-                      <h4>
-                        {assignment.title}
-                      </h4>
-                    </div>
-
-                    <span className="homework-status">
-                      {assignment.status || "Assigned"}
+                    <span className="homework-student-avatar">
+                      👩‍🎓
                     </span>
 
-                  </div>
-
-
-                  {/* CARD INFORMATION */}
-
-                  <div className="homework-card-info">
-
                     <div>
-                      <span>👩‍🎓 Student</span>
-                      <strong>{assignedStudent}</strong>
-                    </div>
 
-                    <div>
-                      <span>📅 Due Date</span>
                       <strong>
-                        {formatDate(assignment.due_date)}
+                        {student.full_name}
                       </strong>
-                    </div>
 
-                    <div>
-                      <span>🕒 Assigned On</span>
-                      <strong>
-                        {assignment.assigned_at
-                          ? new Date(
-                              assignment.assigned_at
-                            ).toLocaleDateString()
-                          : "—"}
-                      </strong>
+                      <small>
+                        {student.homework.length}{" "}
+                        {student.homework.length === 1
+                          ? "assignment"
+                          : "assignments"}
+                      </small>
+
                     </div>
 
                   </div>
 
+                  <span className="homework-dropdown-arrow">
+                    ⌄
+                  </span>
 
-                  {/* INSTRUCTIONS */}
+                </summary>
 
-                  <div className="homework-card-description">
 
-                    <strong>Instructions</strong>
+                {/* STUDENT HOMEWORK */}
 
-                    <p>
-                      {assignment.description ||
-                        "No additional instructions."}
+                <div className="homework-student-content">
+
+                  {student.homework.length === 0 ? (
+
+                    <p className="homework-no-student-work">
+                      No homework assigned to this student yet.
                     </p>
 
-                  </div>
+                  ) : (
+
+                    <div className="homework-list">
+
+                      {student.homework.map((assignment) => (
+
+                        <article
+                          className="homework-card"
+                          key={assignment.id}
+                        >
+
+                          {/* HOMEWORK HEADER */}
+
+                          <div className="homework-card-header">
+
+                            <div>
+
+                              <span className="homework-card-subject">
+                                {assignment.subject || "Subject"}
+                              </span>
+
+                              <h4>
+                                {assignment.title}
+                              </h4>
+
+                            </div>
+
+                            <span className="homework-status">
+                              {assignment.status || "Assigned"}
+                            </span>
+
+                          </div>
 
 
-                  {/* ATTACHMENT */}
+                          {/* HOMEWORK INFORMATION */}
 
-                  {assignment.attachment_path && (
+                          <div className="homework-card-info">
 
-                    <button
-                      type="button"
-                      className="homework-attachment-button"
-                      onClick={() =>
-                        openAttachment(
-                          assignment.attachment_path
-                        )
-                      }
-                    >
-                      📎 Open Attachment
-                    </button>
+                            <div>
+                              <span>👩‍🏫 Teacher</span>
+
+                              <strong>
+                                {assignment.teacher_name ||
+                                  "Not recorded"}
+                              </strong>
+                            </div>
+
+                            <div>
+                              <span>📅 Due Date</span>
+
+                              <strong>
+                                {formatDate(assignment.due_date)}
+                              </strong>
+                            </div>
+
+                            <div>
+                              <span>🕒 Assigned On</span>
+
+                              <strong>
+                                {assignment.assigned_at
+                                  ? new Date(
+                                      assignment.assigned_at
+                                    ).toLocaleDateString()
+                                  : "—"}
+                              </strong>
+                            </div>
+
+                          </div>
+
+
+                          {/* INSTRUCTIONS */}
+
+                          <div className="homework-card-description">
+
+                            <strong>
+                              Instructions
+                            </strong>
+
+                            <p>
+                              {assignment.description ||
+                                "No additional instructions."}
+                            </p>
+
+                          </div>
+
+
+                          {/* ATTACHMENT */}
+
+                          {assignment.attachment_path && (
+
+                            <button
+                              type="button"
+                              className="homework-attachment-button"
+                              onClick={() =>
+                                openAttachment(
+                                  assignment.attachment_path
+                                )
+                              }
+                            >
+                              📎 Open Attachment
+                            </button>
+
+                          )}
+
+                        </article>
+
+                      ))}
+
+                    </div>
 
                   )}
 
-                </article>
+                </div>
 
-              );
+              </details>
 
-            })}
+            ))}
 
           </div>
 
