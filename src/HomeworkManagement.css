@@ -512,3 +512,143 @@
   }
 
 }
+/* TEACHER FILTER */
+
+.homework-filter-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin: 15px 0 22px;
+}
+
+.homework-filter-control {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: 250px;
+}
+
+.homework-filter-control label {
+  color: #735d8b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.homework-filter-control select {
+  padding: 11px;
+  border: 1px solid #e5d9f1;
+  border-radius: 10px;
+  background: #f8f5ff;
+  color: #51465c;
+  font-size: 13px;
+}
+
+/* STUDENT GROUPS */
+
+.homework-student-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.homework-student-group {
+  background: #fcfaff;
+  border: 1px solid #eee5f5;
+  border-radius: 15px;
+  overflow: hidden;
+}
+
+.homework-student-group[open] {
+  border-color: #d9c9ed;
+}
+
+/* STUDENT HEADING */
+
+.homework-student-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 17px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.homework-student-summary::-webkit-details-marker {
+  display: none;
+}
+
+.homework-student-info {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.homework-student-avatar {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0eaff;
+  border-radius: 12px;
+  font-size: 21px;
+}
+
+.homework-student-info strong {
+  display: block;
+  font-size: 14px;
+  color: #68527f;
+}
+
+.homework-student-info small {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  color: #a194ac;
+}
+
+/* DROPDOWN ARROW */
+
+.homework-dropdown-arrow {
+  font-size: 22px;
+  color: #9278b3;
+  transition: transform 0.2s ease;
+}
+
+.homework-student-group[open]
+.homework-dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+/* STUDENT CONTENT */
+
+.homework-student-content {
+  padding: 0 15px 17px;
+  border-top: 1px solid #f0e9f4;
+}
+
+.homework-student-content .homework-list {
+  padding-top: 15px;
+}
+
+.homework-no-student-work {
+  padding: 15px;
+  color: #a397aa;
+  font-size: 12px;
+}
+
+/* MOBILE */
+
+@media (max-width: 600px) {
+  .homework-filter-toolbar {
+    justify-content: stretch;
+  }
+
+  .homework-filter-control {
+    width: 100%;
+  }
+
+  .homework-student-summary {
+    padding: 13px;
+  }
+}
