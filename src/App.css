@@ -2300,3 +2300,77 @@ button {
     font-size: 12px;
   }
 }
+/* =====================================
+   LEARNOVA GLOBAL FORM STYLING
+   ===================================== */
+
+/* Force light appearance for form controls */
+:root {
+  color-scheme: light;
+}
+
+/* All text boxes, dropdowns and text areas */
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+select,
+textarea {
+  background-color: #f7f4ff !important;
+  color: #51465c !important;
+  border: 1px solid #e4d9f2 !important;
+  border-radius: 10px !important;
+  padding: 11px 13px;
+  font-family: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+/* Placeholder text */
+
+input::placeholder,
+textarea::placeholder {
+  color: #a397b0 !important;
+  opacity: 1;
+}
+
+/* Dropdown options */
+
+select option {
+  background-color: #ffffff;
+  color: #51465c;
+}
+
+/* Date and time fields */
+
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  color-scheme: light;
+}
+
+/* Focus effect */
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none !important;
+  border-color: #a58ad6 !important;
+  box-shadow: 0 0 0 3px rgba(165, 138, 214, 0.15);
+}
+
+/* Disabled fields */
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background-color: #eeeaf5 !important;
+  color: #999 !important;
+  cursor: not-allowed;
+}
+
+/* Smooth transition */
+
+input,
+select,
+textarea {
+  transition: all 0.2s ease;
+}
