@@ -1,4 +1,3 @@
-?variant="standard" title="Complete HomeworkManagement.jsx" id="62841"}
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import "./HomeworkManagement.css";
@@ -24,9 +23,7 @@ function HomeworkManagement() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // =====================================
   // LOAD STUDENTS AND HOMEWORK
-  // =====================================
 
   async function loadData() {
     setLoading(true);
@@ -74,9 +71,7 @@ function HomeworkManagement() {
     loadData();
   }, []);
 
-  // =====================================
   // UPLOAD ATTACHMENT
-  // =====================================
 
   async function uploadAttachment(file) {
     const safeName = file.name.replace(
@@ -103,9 +98,7 @@ function HomeworkManagement() {
     return filePath;
   }
 
-  // =====================================
   // CREATE AND ASSIGN HOMEWORK
-  // =====================================
 
   async function createHomework(event) {
     event.preventDefault();
@@ -157,7 +150,7 @@ function HomeworkManagement() {
         uploadedPath = await uploadAttachment(selectedFile);
       }
 
-      // Prepare assignment records
+      // Prepare homework records
 
       const rows = selectedStudents.map((student) => ({
         student_id: student.id,
@@ -175,7 +168,8 @@ function HomeworkManagement() {
         .insert(rows);
 
       if (error) {
-        // Remove uploaded file if assignment creation fails
+
+        // Remove uploaded file if assignment fails
 
         if (uploadedPath) {
           const { error: removeError } =
@@ -198,7 +192,7 @@ function HomeworkManagement() {
         return;
       }
 
-      // Reset form
+      // RESET FORM
 
       setTitle("");
       setSubject("Mathematics");
@@ -216,7 +210,7 @@ function HomeworkManagement() {
         fileInput.value = "";
       }
 
-      // Refresh homework list
+      // Refresh assignments
 
       await loadData();
 
@@ -231,9 +225,7 @@ function HomeworkManagement() {
     }
   }
 
-  // =====================================
-  // OPEN ATTACHMENT
-  // =====================================
+  // OPEN PRIVATE ATTACHMENT
 
   async function openAttachment(filePath) {
     setMessage("");
@@ -256,9 +248,7 @@ function HomeworkManagement() {
     );
   }
 
-  // =====================================
   // FORMAT DATE
-  // =====================================
 
   function formatDate(date) {
     if (!date) return "No deadline";
@@ -273,9 +263,7 @@ function HomeworkManagement() {
     );
   }
 
-  // =====================================
-  // TEACHER FILTER
-  // =====================================
+  // TEACHER FILTER OPTIONS
 
   const teacherNames = [
     ...new Set(
@@ -284,6 +272,8 @@ function HomeworkManagement() {
         .filter(Boolean)
     ),
   ].sort();
+
+  // FILTER ASSIGNMENTS BY TEACHER
 
   const visibleAssignments = assignments.filter(
     (assignment) => {
@@ -301,9 +291,7 @@ function HomeworkManagement() {
     }
   );
 
-  // =====================================
   // GROUP HOMEWORK BY STUDENT
-  // =====================================
 
   const studentGroups = students
     .map((student) => ({
@@ -320,9 +308,7 @@ function HomeworkManagement() {
         student.homework.length > 0
     );
 
-  // =====================================
   // MAIN PAGE
-  // =====================================
 
   return (
     <section className="homework-management">
@@ -664,9 +650,7 @@ function HomeworkManagement() {
       </div>
 
 
-      {/* =====================================
-          ASSIGNED HOMEWORK SECTION
-      ===================================== */}
+      {/* ASSIGNED HOMEWORK */}
 
       <div className="homework-assigned-section">
 
