@@ -743,12 +743,11 @@ function TestMaker() {
         throw new Error("Question paper must be below 50 MB.");
       }
 
-      const questionError = validateQuestions();
+      const validationError = validateQuestions();
 
-      if (questionError) {
-        throw new Error(questionError);
+      if (validationError) {
+      throw new Error(validationError);
       }
-
       const {
         data: { user },
         error: userError,
