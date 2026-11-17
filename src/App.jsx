@@ -7,7 +7,7 @@ import StudentGamification from "./StudentGamification";
 import StudentTimetable from "./StudentTimetable";
 import StudentSubjects from "./StudentSubjects";
 import StudentAnnouncements from "./StudentAnnouncements";
-import "./App.css";
+import StudentTests from "./StudentTests";mport "./App.css";
 
 function formatScheduleTime(value) {
   if (!value) return "Time TBA";
@@ -546,6 +546,7 @@ useEffect(() => {
     { icon: "🏡", name: "Dashboard" },
     { icon: "📚", name: "My Subjects" },
     { icon: "🗓️", name: "Timetable" },
+    { icon: "📝", name: "My Tests" },
     { icon: "📝", name: "Homework" },
     { icon: "📢", name: "Announcements" },
     { icon: "🏆", name: "Achievements" },
@@ -949,6 +950,8 @@ useEffect(() => {
          <StudentHomework />
        ) : activeTab === "Timetable" ? (
          <StudentTimetable />
+      ) : activeTab === "My Tests" ? (
+         <StudentTests />
        ) : activeTab === "Achievements" ? (
          <StudentGamification />
        ) : activeTab === "Announcements" ? (
