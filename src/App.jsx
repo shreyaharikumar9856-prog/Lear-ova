@@ -8,6 +8,7 @@ import StudentTimetable from "./StudentTimetable";
 import StudentSubjects from "./StudentSubjects";
 import StudentAnnouncements from "./StudentAnnouncements";
 import StudentTests from "./StudentTests";
+import "./App.css";
 
 function formatScheduleTime(value) {
   if (!value) return "Time TBA";
