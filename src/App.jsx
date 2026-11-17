@@ -46,7 +46,13 @@ function App() {
   const [role, setRole] = useState(null);
   const [checkingRole, setCheckingRole] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [activeTab, setActiveTab] = useState("Dashboard");
+  const [activeTab, setActiveTab] = useState(() => {
+  try {
+    return localStorage.getItem("learnova_student_active_tab") || "Dashboard";
+  } catch {
+    return "Dashboard";
+  }
+});
   const [selectedAvatar, setSelectedAvatar] = useState(null);
   const [dashboardData, setDashboardData] = useState({
     loading: true,
@@ -154,6 +160,15 @@ function App() {
     };
   }, [user]);
 
+  // Remember the student's current page
+useEffect(() => {
+  try {
+    localStorage.setItem("learnova_student_active_tab", activeTab);
+  } catch (error) {
+    console.error("Unable to save active tab:", error);
+  }
+}, [activeTab]);
+  
   // Fetch selected avatar and listen for avatar changes
   useEffect(() => {
     let cancelled = false;
