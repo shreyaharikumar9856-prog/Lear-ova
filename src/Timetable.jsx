@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "./supabaseClient";
 
 const initialForm = {
@@ -16,15 +16,69 @@ const initialForm = {
   notes: "",
 };
 
+const TIMETABLE_DRAFT_KEY = "learnova_timetable_draft";
+
+function readTimetableDraft() {
+  try {
+    const saved = localStorage.getItem(TIMETABLE_DRAFT_KEY);
+    return saved ? JSON.parse(saved) : {};
+  } catch (error) {
+    console.error("Unable to read timetable draft:", error);
+    return {};
+  }
+}
+
 export default function Timetable() {
   const [students, setStudents] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const [editingId, setEditingId] = useState(null);
-  const [activeTeacher, setActiveTeacher] = useState("All Teachers");
 
-  const [form, setForm] = useState(initialForm);
+  const [savedDraft] = useState(readTimetableDraft);
+  const isClearingDraft = useRef(false);
+
+  const [editingId, setEditingId] = useState(
+    savedDraft.editingId ?? null
+  );
+
+  const [activeTeacher, setActiveTeacher] = useState(
+    savedDraft.activeTeacher || "All Teachers"
+  );
+
+  const [form, setForm] = useState(() => ({
+    ...initialForm,
+    ...(savedDraft.form || {}),
+  }));
+
+  // AUTOMATICALLY SAVE UNFINISHED TIMETABLE DETAILS
+
+  useEffect(() => {
+    if (isClearingDraft.current) {
+      try {
+        localStorage.removeItem(TIMETABLE_DRAFT_KEY);
+      } catch (error) {
+        console.error("Unable to clear timetable draft:", error);
+      }
+
+      isClearingDraft.current = false;
+      return;
+    }
+
+    const draft = {
+      form,
+      editingId,
+      activeTeacher,
+    };
+
+    try {
+      localStorage.setItem(
+        TIMETABLE_DRAFT_KEY,
+        JSON.stringify(draft)
+      );
+    } catch (error) {
+      console.error("Unable to save timetable draft:", error);
+    }
+  }, [form, editingId, activeTeacher]);
 
   const days = [
     "Monday",
@@ -75,7 +129,7 @@ export default function Timetable() {
     });
   }
 
-  // Convert 12-hour time into database-compatible 24-hour time.
+  // CONVERT 12-HOUR TIME INTO DATABASE-COMPATIBLE 24-HOUR TIME
 
   function toDatabaseTime(hour, minute, period) {
     let h = Number(hour);
@@ -98,7 +152,7 @@ export default function Timetable() {
     return h * 60 + Number(minute);
   }
 
-  // Convert database time into 12-hour format for editing.
+  // CONVERT DATABASE TIME INTO 12-HOUR FORMAT FOR EDITING
 
   function parseDatabaseTime(time) {
     const [hourText, minuteText] = time.split(":");
@@ -126,6 +180,8 @@ export default function Timetable() {
       hour12: true,
     });
   }
+
+  // TIME PICKER
 
   function renderTimePicker(label, prefix) {
     return (
@@ -192,6 +248,8 @@ export default function Timetable() {
     );
   }
 
+  // ADD OR UPDATE SCHEDULE
+
   async function addSchedule(e) {
     e.preventDefault();
     setMessage("");
@@ -226,16 +284,19 @@ export default function Timetable() {
       student_id: form.student_id || null,
       subject: form.subject.trim(),
       day_of_week: form.day_of_week,
+
       start_time: toDatabaseTime(
         form.start_hour,
         form.start_minute,
         form.start_period
       ),
+
       end_time: toDatabaseTime(
         form.end_hour,
         form.end_minute,
         form.end_period
       ),
+
       teacher_name: form.teacher_name.trim(),
       meeting_link: form.meeting_link.trim() || null,
       notes: form.notes.trim() || null,
@@ -261,6 +322,10 @@ export default function Timetable() {
 
     const teacher = form.teacher_name.trim();
 
+    // CLEAR DRAFT AFTER SUCCESSFUL SAVE
+
+    isClearingDraft.current = true;
+
     setMessage(
       editingId
         ? "Schedule updated successfully!"
@@ -273,6 +338,8 @@ export default function Timetable() {
 
     await loadData();
   }
+
+  // EDIT EXISTING SCHEDULE
 
   function editSchedule(schedule) {
     const start = parseDatabaseTime(schedule.start_time);
@@ -304,6 +371,8 @@ export default function Timetable() {
       behavior: "smooth",
     });
   }
+
+  // DELETE SCHEDULE
 
   async function deleteSchedule(id) {
     const confirmed = window.confirm(
@@ -337,7 +406,7 @@ export default function Timetable() {
     );
   }
 
-  // Automatically collect teacher names from saved schedules.
+  // AUTOMATICALLY COLLECT TEACHER NAMES FROM SAVED SCHEDULES
 
   const teachers = [
     ...new Set(
@@ -354,6 +423,8 @@ export default function Timetable() {
           (schedule) =>
             schedule.teacher_name === activeTeacher
         );
+
+  // STYLES
 
   const styles = {
     container: {
@@ -443,6 +514,8 @@ export default function Timetable() {
       border: "1px solid #7868d6",
     },
   };
+
+  // PAGE UI
 
   return (
     <div style={styles.container}>
@@ -587,6 +660,7 @@ export default function Timetable() {
           <button
             type="button"
             onClick={() => {
+              isClearingDraft.current = true;
               setForm(initialForm);
               setEditingId(null);
               setMessage("");
@@ -615,7 +689,7 @@ export default function Timetable() {
         📚 Existing Schedules
       </h3>
 
-      {/* Teacher Tabs */}
+      {/* TEACHER TABS */}
 
       <div style={styles.tabs}>
 
@@ -748,4 +822,4 @@ export default function Timetable() {
 
     </div>
   );
-}0
+}
