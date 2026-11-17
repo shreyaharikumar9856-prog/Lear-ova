@@ -65,7 +65,20 @@ const sectionDescriptions = {
 };
 
 function TeacherDashboard({ onLogout }) {
-  const [activeSection, setActiveSection] = useState("Overview");
+  const [activeSection, setActiveSection] = useState(() => {
+  try {
+    return localStorage.getItem("learnova_teacher_active_section") || "Overview";
+  } catch {
+    return "Overview";
+  }
+});
+  useEffect(() => {
+  try {
+    localStorage.setItem("learnova_teacher_active_section", activeSection);
+  } catch (error) {
+    console.error("Unable to save teacher section:", error);
+  }
+}, [activeSection]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
