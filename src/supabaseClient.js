@@ -5,5 +5,13 @@ const supabaseKey = 'sb_publishable_CBhc2QC60jM87NsdXq0ymA_CAjYYLRG';
 
 export const supabase = createClient(
   supabaseUrl,
-  supabaseKey
+  supabaseKey,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: window.localStorage
+    }
+  }
 );
