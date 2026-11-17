@@ -1,20 +1,34 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "./supabaseClient";
 import "./HomeworkManagement.css";
 
 const BUCKET_NAME = "homework-files";
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
+const DRAFT_KEY = "learnova_homework_draft";
+
+function readHomeworkDraft() {
+  try {
+    const saved = localStorage.getItem(DRAFT_KEY);
+    return saved ? JSON.parse(saved) : {};
+  } catch (error) {
+    console.error("Unable to read homework draft:", error);
+    return {};
+  }
+}
 
 function HomeworkManagement() {
   const [students, setStudents] = useState([]);
   const [assignments, setAssignments] = useState([]);
 
-  const [title, setTitle] = useState("");
-  const [subject, setSubject] = useState("Mathematics");
-  const [description, setDescription] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [studentId, setStudentId] = useState("all");
-  const [teacherName, setTeacherName] = useState("");
+  const [initialDraft] = useState(readHomeworkDraft);
+  const isClearingDraft = useRef(false);
+
+  const [title, setTitle] = useState(initialDraft.title || "");
+  const [subject, setSubject] = useState(initialDraft.subject || "Mathematics");
+  const [description, setDescription] = useState(initialDraft.description || "");
+  const [dueDate, setDueDate] = useState(initialDraft.dueDate || "");
+  const [studentId, setStudentId] = useState(initialDraft.studentId || "all");
+  const [teacherName, setTeacherName] = useState(initialDraft.teacherName || "");
   const [selectedFile, setSelectedFile] = useState(null);
 
   const [teacherFilter, setTeacherFilter] = useState("all");
@@ -22,6 +36,43 @@ function HomeworkManagement() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // AUTOMATIC HOMEWORK DRAFT SAVING
+
+  useEffect(() => {
+    if (isClearingDraft.current) {
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch (error) {
+        console.error("Unable to clear draft:", error);
+      }
+
+      isClearingDraft.current = false;
+      return;
+    }
+
+    const draft = {
+      title,
+      subject,
+      description,
+      dueDate,
+      studentId,
+      teacherName,
+    };
+
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch (error) {
+      console.error("Unable to save draft:", error);
+    }
+  }, [
+    title,
+    subject,
+    description,
+    dueDate,
+    studentId,
+    teacherName,
+  ]);
 
   // LOAD STUDENTS AND HOMEWORK
 
@@ -144,13 +195,13 @@ function HomeworkManagement() {
         return;
       }
 
-      // Upload attachment once for all selected students
+      // UPLOAD ATTACHMENT
 
       if (selectedFile) {
         uploadedPath = await uploadAttachment(selectedFile);
       }
 
-      // Prepare homework records
+      // PREPARE HOMEWORK RECORDS
 
       const rows = selectedStudents.map((student) => ({
         student_id: student.id,
@@ -168,9 +219,6 @@ function HomeworkManagement() {
         .insert(rows);
 
       if (error) {
-
-        // Remove uploaded file if assignment fails
-
         if (uploadedPath) {
           const { error: removeError } =
             await supabase.storage
@@ -192,7 +240,9 @@ function HomeworkManagement() {
         return;
       }
 
-      // RESET FORM
+      // CLEAR FORM AFTER SUCCESSFUL ASSIGNMENT
+
+      isClearingDraft.current = true;
 
       setTitle("");
       setSubject("Mathematics");
@@ -209,8 +259,6 @@ function HomeworkManagement() {
       if (fileInput) {
         fileInput.value = "";
       }
-
-      // Refresh assignments
 
       await loadData();
 
@@ -309,14 +357,12 @@ function HomeworkManagement() {
     );
 
   // MAIN PAGE
-
   return (
     <section className="homework-management">
 
       {/* HEADER */}
 
       <div className="homework-page-header">
-
         <div>
           <span className="homework-tag">
             LEARNOVA • TEACHER SPACE
@@ -333,16 +379,13 @@ function HomeworkManagement() {
         <div className="homework-header-icon">
           📝
         </div>
-
       </div>
-
 
       {/* CREATE HOMEWORK */}
 
       <div className="homework-panel">
 
         <div className="homework-panel-heading">
-
           <div className="homework-section-icon">
             ✏️
           </div>
@@ -353,9 +396,7 @@ function HomeworkManagement() {
               Fill in the details below to assign homework.
             </p>
           </div>
-
         </div>
-
 
         <form
           onSubmit={createHomework}
@@ -365,7 +406,6 @@ function HomeworkManagement() {
           {/* TEACHER NAME */}
 
           <div className="homework-field homework-full-width">
-
             <label htmlFor="homework-teacher">
               Teacher Name *
             </label>
@@ -380,14 +420,11 @@ function HomeworkManagement() {
               placeholder="Enter teacher name"
               required
             />
-
           </div>
-
 
           {/* HOMEWORK TITLE */}
 
           <div className="homework-field homework-full-width">
-
             <label htmlFor="homework-title">
               Homework Title *
             </label>
@@ -402,16 +439,13 @@ function HomeworkManagement() {
               placeholder="e.g. Chapter 4 exercises"
               required
             />
-
           </div>
-
 
           {/* SUBJECT AND STUDENT */}
 
           <div className="homework-form-row">
 
             <div className="homework-field">
-
               <label htmlFor="homework-subject">
                 Subject *
               </label>
@@ -434,12 +468,9 @@ function HomeworkManagement() {
                 <option>Social Science</option>
                 <option>Other</option>
               </select>
-
             </div>
 
-
             <div className="homework-field">
-
               <label htmlFor="homework-student">
                 Assign To *
               </label>
@@ -451,7 +482,6 @@ function HomeworkManagement() {
                   setStudentId(event.target.value)
                 }
               >
-
                 <option value="all">
                   All Students
                 </option>
@@ -464,18 +494,14 @@ function HomeworkManagement() {
                     {student.full_name}
                   </option>
                 ))}
-
               </select>
-
             </div>
 
           </div>
 
-
           {/* INSTRUCTIONS */}
 
           <div className="homework-field homework-full-width">
-
             <label htmlFor="homework-description">
               Instructions *
             </label>
@@ -495,14 +521,11 @@ function HomeworkManagement() {
               Provide clear instructions so students understand
               what they need to do.
             </small>
-
           </div>
-
 
           {/* DUE DATE */}
 
           <div className="homework-field homework-full-width">
-
             <label htmlFor="homework-date">
               📅 Due Date
             </label>
@@ -515,9 +538,7 @@ function HomeworkManagement() {
                 setDueDate(event.target.value)
               }
             />
-
           </div>
-
 
           {/* FILE UPLOAD */}
 
@@ -562,7 +583,6 @@ function HomeworkManagement() {
                 />
 
                 {selectedFile && (
-
                   <div className="homework-selected-file">
 
                     ✅ {selectedFile.name}
@@ -594,11 +614,9 @@ function HomeworkManagement() {
                     </button>
 
                   </div>
-
                 )}
 
               </div>
-
             </div>
 
             <small>
@@ -607,11 +625,9 @@ function HomeworkManagement() {
 
           </div>
 
-
           {/* MESSAGE */}
 
           {message && (
-
             <div
               className={`homework-message ${
                 message.toLowerCase().includes("success")
@@ -623,34 +639,25 @@ function HomeworkManagement() {
             >
               {message}
             </div>
-
           )}
-
 
           {/* ASSIGN BUTTON */}
 
           <div className="homework-submit-area">
-
             <button
               type="submit"
               className="homework-submit-button"
               disabled={saving || loading}
             >
-
               {saving
                 ? "⏳ Uploading and assigning..."
                 : "✨ Assign Homework"}
-
             </button>
-
           </div>
 
         </form>
-
       </div>
-
-
-      {/* ASSIGNED HOMEWORK */}
+            {/* ASSIGNED HOMEWORK */}
 
       <div className="homework-assigned-section">
 
@@ -673,7 +680,6 @@ function HomeworkManagement() {
           </span>
 
         </div>
-
 
         {/* TEACHER FILTER */}
 
@@ -702,22 +708,18 @@ function HomeworkManagement() {
               </option>
 
               {teacherNames.map((teacher) => (
-
                 <option
                   key={teacher}
                   value={teacher}
                 >
                   {teacher}
                 </option>
-
               ))}
 
             </select>
 
           </div>
-
         </div>
-
 
         {/* LOADING */}
 
@@ -739,6 +741,7 @@ function HomeworkManagement() {
           <div className="homework-no-assignments">
             <div>🌼</div>
             <h3>No assignments found</h3>
+
             <p>
               No homework is available for this teacher.
             </p>
@@ -790,7 +793,6 @@ function HomeworkManagement() {
 
                 </summary>
 
-
                 {/* STUDENT HOMEWORK */}
 
                 <div className="homework-student-content">
@@ -834,7 +836,6 @@ function HomeworkManagement() {
 
                           </div>
 
-
                           {/* HOMEWORK INFORMATION */}
 
                           <div className="homework-card-info">
@@ -870,7 +871,6 @@ function HomeworkManagement() {
 
                           </div>
 
-
                           {/* INSTRUCTIONS */}
 
                           <div className="homework-card-description">
@@ -885,7 +885,6 @@ function HomeworkManagement() {
                             </p>
 
                           </div>
-
 
                           {/* ATTACHMENT */}
 
