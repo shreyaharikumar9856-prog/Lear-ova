@@ -7,7 +7,7 @@ import StudentGamification from "./StudentGamification";
 import StudentTimetable from "./StudentTimetable";
 import StudentSubjects from "./StudentSubjects";
 import StudentAnnouncements from "./StudentAnnouncements";
-import StudentTests from "./StudentTests";mport "./App.css";
+import StudentTests from "./StudentTests";
 
 function formatScheduleTime(value) {
   if (!value) return "Time TBA";
