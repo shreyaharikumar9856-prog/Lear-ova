@@ -395,13 +395,9 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
   // ==========================================
 
   useEffect(() => {
-    if (
-      !attempt?.deadline_at ||
-      submitted ||
-      !isExam
-    ) {
-      return;
-    }
+   if (!attempt?.deadline_at || submitted) {
+  return;
+}
 
     const updateTimer = () => {
       const remaining = Math.max(
@@ -835,7 +831,7 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
           <h2>{test.title}</h2>
         </div>
 
-        {isExam && secondsLeft !== null && (
+        {attempt.deadline_at && secondsLeft !== null && (
           <div className="runner-timer">
             <span>Time Remaining</span>
             <strong>{formatTime(secondsLeft)}</strong>
