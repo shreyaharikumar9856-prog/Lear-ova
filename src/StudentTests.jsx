@@ -199,33 +199,36 @@ function StudentTests() {
     );
   }
 
-  if (loading) {
-      if (runningTest) {
-    return (
-      <StudentTestRunner
-        test={{
-          ...runningTest,
-          subject_name: getSubjectName(runningTest.subject_id),
-        }}
-        onBack={() => {
-          setRunningTest(null);
-          setSelectedTest(null);
-          loadStudentTests();
-        }}
-        onSubmitted={() => {
-          loadStudentTests();
-        }}
-      />
-    );
-  }
-    return (
-      <section className="student-tests-page">
-        <p className="student-tests-loading">
-          Loading your tests... 🌷
-        </p>
-      </section>
-    );
-  }
+// OPEN TEST RUNNER
+if (runningTest) {
+  return (
+    <StudentTestRunner
+      test={{
+        ...runningTest,
+        subject_name: getSubjectName(runningTest.subject_id),
+      }}
+      onBack={() => {
+        setRunningTest(null);
+        setSelectedTest(null);
+        loadStudentTests();
+      }}
+      onSubmitted={() => {
+        loadStudentTests();
+      }}
+    />
+  );
+}
+
+// LOADING SCREEN
+if (loading) {
+  return (
+    <section className="student-tests-page">
+      <p className="student-tests-loading">
+        Loading your tests... 🌷
+      </p>
+    </section>
+  );
+}
 
   if (error) {
     return (
