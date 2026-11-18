@@ -712,8 +712,12 @@ function TestMaker() {
         throw new Error("Add at least one question.");
       }
 
-      if (Number(duration) <= 0) {
-        throw new Error("Enter a valid test duration.");
+     if (assessmentType === "exam" && Number(duration) <= 0) {
+       throw new Error("Examination Mode requires a timer.");
+      }
+
+     if (assessmentType === "practice" && Number(duration) < 0) {
+       throw new Error("Duration cannot be negative.");
       }
 
       if (startDate && endDate) {
@@ -898,6 +902,7 @@ function TestMaker() {
       setStartDate("");
       setEndDate("");
       setTestMode("online");
+      setAssessmentType("practice");
       setAllowMultipleAttempts(false);
       setMaxAttempts(2);
       setShuffleQuestions(false);
@@ -1724,104 +1729,25 @@ function TestMaker() {
           3. Test Settings
         </h4>
 
-        <div className="tm-grid">
+       <div className="tm-field">
+  <label>Duration (Minutes)</label>
 
-          <div className="tm-field">
+  <input
+    type="number"
+    min={assessmentType === "exam" ? "1" : "0"}
+    value={duration}
+    onChange={(event) =>
+      setDuration(event.target.value)
+    }
+    required={assessmentType === "exam"}
+  />
 
-            <label>Examination Mode</label>
-
-            <select
-              value={testMode}
-              onChange={(event) =>
-                setTestMode(event.target.value)
-              }
-            >
-              <option value="online">Online Test</option>
-              <option value="upload">Upload Answer Sheet</option>
-              <option value="hybrid">Hybrid Test</option>
-            </select>
-
-          </div>
-
-
-          <div className="tm-field">
-
-            <label>Duration (Minutes) *</label>
-
-            <input
-              type="number"
-              min="1"
-              value={duration}
-              onChange={(event) =>
-                setDuration(event.target.value)
-              }
-              required
-            />
-
-          </div>
-
-
-          <div className="tm-field">
-
-            <label>Passing Marks</label>
-
-            <input
-              type="number"
-              min="0"
-              max={totalMarks}
-              step="0.5"
-              value={passingMarks}
-              onChange={(event) =>
-                setPassingMarks(event.target.value)
-              }
-              placeholder={`Maximum ${totalMarks}`}
-            />
-
-          </div>
-
-
-          <div className="tm-field">
-
-            <label>Total Marks</label>
-
-            <div className="tm-total-marks">
-              🏆 {totalMarks} Marks
-            </div>
-
-          </div>
-
-
-          <div className="tm-field">
-
-            <label>Start Date & Time</label>
-
-            <input
-              type="datetime-local"
-              value={startDate}
-              onChange={(event) =>
-                setStartDate(event.target.value)
-              }
-            />
-
-          </div>
-
-
-          <div className="tm-field">
-
-            <label>End Date & Time</label>
-
-            <input
-              type="datetime-local"
-              value={endDate}
-              onChange={(event) =>
-                setEndDate(event.target.value)
-              }
-            />
-
-          </div>
-
-        </div>
-
+  <small>
+    {assessmentType === "exam"
+      ? "A timer is mandatory for examinations."
+      : "Enter 0 for unlimited practice time."}
+  </small>
+</div>
 
         {/* EXTRA SETTINGS */}
 
@@ -2106,7 +2032,11 @@ function TestMaker() {
                 <div className="tm-test-details">
 
                   <span>
-                    ⏱ {test.duration_minutes} minutes
+                    ⏱ {
+                      Number(test.duration_minutes) > 0
+                         ? `${test.duration_minutes} minutes`
+                         : "No time limit"
+                    }
                   </span>
 
                   <span>
