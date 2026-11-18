@@ -73,6 +73,7 @@ function TestMaker() {
   const [grade, setGrade] = useState("");
   const [description, setDescription] = useState("");
   const [teacherName, setTeacherName] = useState("");
+  const [assessmentType, setAssessmentType] = useState("practice");
 
   const [testMode, setTestMode] = useState("online");
 
@@ -769,8 +770,9 @@ function TestMaker() {
         title: title.trim(),
         subject_id: subjectId,
         grade: grade.trim() || null,
-        description: description.trim() || null,
-        test_mode: testMode,
+       description: description.trim() || null,
+       assessment_type: assessmentType,
+       test_mode: testMode,
         duration_minutes: Number(duration),
         scheduled_start: startDate
           ? new Date(startDate).toISOString()
@@ -1728,6 +1730,29 @@ function TestMaker() {
         <h4 className="tm-subheading">
           3. Test Settings
         </h4>
+        <div className="tm-grid">
+
+  <div className="tm-field">
+    <label>Assessment Type *</label>
+
+    <select
+      value={assessmentType}
+      onChange={(event) =>
+        setAssessmentType(event.target.value)
+      }
+      required
+    >
+      <option value="exam">📝 Examination Mode</option>
+      <option value="practice">📚 Practice Mode</option>
+    </select>
+
+    <small>
+      Examination Mode applies formal exam rules.
+      Practice Mode allows flexible revision.
+    </small>
+  </div>
+
+</div>
 
        <div className="tm-field">
   <label>Duration (Minutes)</label>
