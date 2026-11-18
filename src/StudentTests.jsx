@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
+import StudentTestRunner from "./StudentTestRunner";
 import "./StudentTests.css";
 
 function getTestAvailability(test) {
@@ -33,6 +34,7 @@ function StudentTests() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedTest, setSelectedTest] = useState(null);
+  const [runningTest, setRunningTest] = useState(null);
 
   useEffect(() => {
     loadStudentTests();
@@ -198,6 +200,24 @@ function StudentTests() {
   }
 
   if (loading) {
+      if (runningTest) {
+    return (
+      <StudentTestRunner
+        test={{
+          ...runningTest,
+          subject_name: getSubjectName(runningTest.subject_id),
+        }}
+        onBack={() => {
+          setRunningTest(null);
+          setSelectedTest(null);
+          loadStudentTests();
+        }}
+        onSubmitted={() => {
+          loadStudentTests();
+        }}
+      />
+    );
+  }
     return (
       <section className="student-tests-page">
         <p className="student-tests-loading">
@@ -293,13 +313,29 @@ function StudentTests() {
             {getTestAvailability(selectedTest)}
           </p>
 
-          <p className="student-test-next-step">
-            {getTestAvailability(selectedTest) === "available"
-              ? "Your test is available. The examination screen will be connected in the next step."
-              : getTestAvailability(selectedTest) === "upcoming"
-              ? "This test is not open yet. Come back at the scheduled start time."
-              : "The scheduled time for this test has ended."}
-          </p>
+          {getTestAvailability(selectedTest) === "available" ? (
+  <div>
+    <p className="student-test-next-step">
+      Your test is ready. Good luck! 🌸
+    </p>
+
+    <button
+      type="button"
+      className="student-test-details-button"
+      onClick={() => setRunningTest(selectedTest)}
+    >
+      {selectedTest.assessment_type === "exam"
+        ? "Start Examination →"
+        : "Start Practice →"}
+    </button>
+  </div>
+) : (
+  <p className="student-test-next-step">
+    {getTestAvailability(selectedTest) === "upcoming"
+      ? "This test is not open yet. Come back at the scheduled start time."
+      : "The scheduled time for this test has ended."}
+  </p>
+)}
         </div>
       )}
 
