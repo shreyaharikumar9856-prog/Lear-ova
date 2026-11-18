@@ -23,6 +23,7 @@ function formatDate(value) {
   return new Date(value).toLocaleString([], {
     dateStyle: "medium",
     timeStyle: "short",
+    hour12: true,
   });
 }
 
@@ -117,6 +118,13 @@ function StudentTests() {
   const expiredTests = tests.filter(
     (test) => getTestAvailability(test) === "expired"
   );
+  const examinationTests = tests.filter(
+    (test) => (test.assessment_type || "practice") === "exam"
+  );
+  
+  const practiceTests = tests.filter(
+    (test) => (test.assessment_type || "practice") === "practice"
+  );
 
   function renderTestCard(test) {
     const availability = getTestAvailability(test);
@@ -147,10 +155,21 @@ function StudentTests() {
           </p>
         )}
 
-        <div className="student-test-details">
-          <span>⏱ {test.duration_minutes} minutes</span>
-          <span>🏆 {test.total_marks} marks</span>
-        </div>
+       <div className="student-test-details">
+  <span>
+    ⏱ {Number(test.duration_minutes) > 0
+      ? `${test.duration_minutes} minutes`
+      : "No time limit"}
+  </span>
+
+  <span>🏆 {test.total_marks} marks</span>
+</div>
+
+<p className="student-test-subject">
+  {test.assessment_type === "exam"
+    ? "📝 Examination Mode"
+    : "📚 Practice Mode"}
+</p>
 
         <div className="student-test-schedule">
           <p>
@@ -250,15 +269,24 @@ function StudentTests() {
           </p>
           <p>
             <strong>Duration:</strong>{" "}
-            {selectedTest.duration_minutes} minutes
+            {Number(selectedTest.duration_minutes) > 0
+               ? `${selectedTest.duration_minutes} minutes`
+               : "No time limit"}
+          </p>
+
+          <p>
+             <strong>Assessment Type:</strong>{" "}
+             {selectedTest.assessment_type === "exam"
+               ? "Examination Mode"
+               : "Practice Mode"}
           </p>
           <p>
             <strong>Total marks:</strong>{" "}
             {selectedTest.total_marks}
           </p>
           <p>
-            <strong>Mode:</strong>{" "}
-            {selectedTest.test_mode}
+           <strong>Delivery Method:</strong>{" "}
+           {selectedTest.test_mode}
           </p>
           <p>
             <strong>Availability:</strong>{" "}
@@ -275,59 +303,45 @@ function StudentTests() {
         </div>
       )}
 
-      <div className="student-tests-section">
-        <div className="student-tests-section-heading">
-          <h3>🌸 Available Tests</h3>
-          <span>{availableTests.length}</span>
-        </div>
+    {/* EXAMINATIONS */}
 
-        {availableTests.length ? (
-          <div className="student-tests-grid">
-            {availableTests.map(renderTestCard)}
-          </div>
-        ) : (
-          <div className="student-tests-empty">
-            <span>🌷</span>
-            <p>No tests are available right now.</p>
-          </div>
-        )}
-      </div>
+<div className="student-tests-section">
+  <div className="student-tests-section-heading">
+    <h3>📝 Examinations</h3>
+    <span>{examinationTests.length}</span>
+  </div>
 
-      <div className="student-tests-section">
-        <div className="student-tests-section-heading">
-          <h3>📅 Upcoming Tests</h3>
-          <span>{upcomingTests.length}</span>
-        </div>
+  {examinationTests.length > 0 ? (
+    <div className="student-tests-grid">
+      {examinationTests.map(renderTestCard)}
+    </div>
+  ) : (
+    <div className="student-tests-empty">
+      <span>📝</span>
+      <p>No examinations assigned yet.</p>
+    </div>
+  )}
+</div>
 
-        {upcomingTests.length ? (
-          <div className="student-tests-grid">
-            {upcomingTests.map(renderTestCard)}
-          </div>
-        ) : (
-          <div className="student-tests-empty">
-            <span>✨</span>
-            <p>No upcoming tests at the moment.</p>
-          </div>
-        )}
-      </div>
+{/* PRACTICE TESTS */}
 
-      <div className="student-tests-section">
-        <div className="student-tests-section-heading">
-          <h3>⌛ Expired Tests</h3>
-          <span>{expiredTests.length}</span>
-        </div>
+<div className="student-tests-section">
+  <div className="student-tests-section-heading">
+    <h3>📚 Practice Tests</h3>
+    <span>{practiceTests.length}</span>
+  </div>
 
-        {expiredTests.length ? (
-          <div className="student-tests-grid">
-            {expiredTests.map(renderTestCard)}
-          </div>
-        ) : (
-          <div className="student-tests-empty">
-            <span>💗</span>
-            <p>No expired tests.</p>
-          </div>
-        )}
-      </div>
+  {practiceTests.length > 0 ? (
+    <div className="student-tests-grid">
+      {practiceTests.map(renderTestCard)}
+    </div>
+  ) : (
+    <div className="student-tests-empty">
+      <span>🌸</span>
+      <p>No practice tests assigned yet.</p>
+    </div>
+  )}
+</div>
 
       <button
         type="button"
