@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import "./TeacherTestSubmissions.css";
 
+// ==========================================
+// HELPERS
+// ==========================================
+
 function formatDate(value) {
   if (!value) return "—";
 
@@ -18,6 +22,10 @@ function isSubjective(type) {
     "long_answer",
     "diagram_label",
   ].includes(type);
+}
+
+function hasWrittenAnswer(answer) {
+  return Boolean(String(answer?.text || "").trim());
 }
 
 function getAnswerText(question, answer) {
@@ -68,7 +76,9 @@ function getAnswerText(question, answer) {
 }
 
 function getCorrectAnswerText(question, key) {
-  if (!key?.correct_answer) return "Answer key unavailable.";
+  if (!key?.correct_answer) {
+    return "Answer key unavailable.";
+  }
 
   const answer = key.correct_answer;
 
@@ -126,6 +136,10 @@ function getCorrectAnswerText(question, key) {
 }
 
 function getStatusLabel(item) {
+  if (item.results_released && Number(item.pending_review_count) > 0) {
+    return "Partial result released";
+  }
+
   if (item.results_released) {
     return "Result released";
   }
@@ -140,6 +154,10 @@ function getStatusLabel(item) {
 
   return "Submitted";
 }
+
+// ==========================================
+// MAIN COMPONENT
+// ==========================================
 
 function TeacherTestSubmissions() {
   const [submissions, setSubmissions] = useState([]);
@@ -162,7 +180,7 @@ function TeacherTestSubmissions() {
   }, []);
 
   // ==========================================
-  // LOAD ALL SUBMISSIONS
+  // LOAD SUBMISSIONS
   // ==========================================
 
   async function loadSubmissions() {
@@ -181,14 +199,12 @@ function TeacherTestSubmissions() {
         );
 
       if (functionError) throw functionError;
-
-      if (data?.error) {
-        throw new Error(data.error);
-      }
+      if (data?.error) throw new Error(data.error);
 
       setSubmissions(data?.submissions || []);
     } catch (err) {
       console.error("Submission loading error:", err);
+
       setError(
         err.message || "Unable to load test submissions."
       );
@@ -198,12 +214,16 @@ function TeacherTestSubmissions() {
   }
 
   // ==========================================
-  // LOAD ONE SUBMISSION
+  // LOAD INDIVIDUAL SUBMISSION
   // ==========================================
 
-  async function loadSubmissionDetail(attemptId, showLoading = true) {
+  async function loadSubmissionDetail(
+    attemptId,
+    showLoading = true
+  ) {
     if (showLoading) {
       setDetailLoading(true);
+      setError("");
       setMessage("");
     }
 
@@ -220,20 +240,14 @@ function TeacherTestSubmissions() {
         );
 
       if (functionError) throw functionError;
-
-      if (data?.error) {
-        throw new Error(data.error);
-      }
+      if (data?.error) throw new Error(data.error);
 
       setSelectedSubmission(data);
 
       const drafts = {};
 
       (data.questions || []).forEach((question) => {
-        if (
-          isSubjective(question.question_type) &&
-          question.response
-        ) {
+        if (question.response) {
           drafts[question.id] = {
             marks_awarded:
               question.response.marks_awarded ?? "",
@@ -245,8 +259,10 @@ function TeacherTestSubmissions() {
       });
 
       setGradeDrafts(drafts);
+
     } catch (err) {
       console.error("Submission detail error:", err);
+
       setError(
         err.message || "Unable to open this submission."
       );
@@ -260,7 +276,7 @@ function TeacherTestSubmissions() {
   }
 
   // ==========================================
-  // UPDATE GRADE DRAFT
+  // UPDATE MARKS AND FEEDBACK
   // ==========================================
 
   function updateGrade(questionId, field, value) {
@@ -275,7 +291,7 @@ function TeacherTestSubmissions() {
   }
 
   // ==========================================
-  // SAVE CORRECTIONS
+  // SAVE TEACHER REVIEW
   // ==========================================
 
   async function saveReview(releaseResult = false) {
@@ -289,41 +305,53 @@ function TeacherTestSubmissions() {
       const grades = [];
 
       for (const question of selectedSubmission.questions || []) {
-        if (
-          !isSubjective(question.question_type) ||
-          !question.response ||
-          !String(question.response.answer?.text || "").trim()
-        ) {
-          continue;
-        }
+        if (!question.response) continue;
 
-        const draft = gradeDrafts[question.id];
+        const subjective = isSubjective(
+          question.question_type
+        );
 
-        if (
-          !draft ||
-          draft.marks_awarded === "" ||
-          draft.marks_awarded === undefined
-        ) {
-          throw new Error(
-            `Please enter marks for Question ${question.question_order}.`
-          );
-        }
+        const draft = gradeDrafts[question.id] || {};
 
-        const marks = Number(draft.marks_awarded);
+        const answered = subjective
+          ? hasWrittenAnswer(question.response.answer)
+          : true;
 
-        if (
-          !Number.isFinite(marks) ||
-          marks < 0 ||
-          marks > Number(question.marks)
-        ) {
-          throw new Error(
-            `Question ${question.question_order}: marks must be between 0 and ${question.marks}.`
-          );
+        // Written answers require marks.
+        if (subjective && answered) {
+          if (
+            draft.marks_awarded === "" ||
+            draft.marks_awarded === undefined
+          ) {
+            throw new Error(
+              `Please enter marks for Question ${question.question_order}.`
+            );
+          }
+
+          const marks = Number(draft.marks_awarded);
+
+          if (
+            !Number.isFinite(marks) ||
+            marks < 0 ||
+            marks > Number(question.marks)
+          ) {
+            throw new Error(
+              `Question ${question.question_order}: marks must be between 0 and ${question.marks}.`
+            );
+          }
         }
 
         grades.push({
           question_id: question.id,
-          marks_awarded: marks,
+
+          ...(subjective && answered
+            ? {
+                marks_awarded: Number(
+                  draft.marks_awarded
+                ),
+              }
+            : {}),
+
           teacher_feedback:
             draft.teacher_feedback || "",
         });
@@ -343,25 +371,25 @@ function TeacherTestSubmissions() {
         );
 
       if (functionError) throw functionError;
-
-      if (data?.error) {
-        throw new Error(data.error);
-      }
+      if (data?.error) throw new Error(data.error);
 
       setMessage(
         data.results_released
           ? "Corrections saved and result released successfully! 🎉"
-          : "Corrections saved successfully."
+          : "Corrections and feedback saved successfully."
       );
 
+      // Refresh the submission and its latest data.
       await loadSubmissionDetail(
         selectedSubmission.attempt.id,
         false
       );
 
       await loadSubmissions();
+
     } catch (err) {
       console.error("Review saving error:", err);
+
       setError(
         err.message || "Unable to save corrections."
       );
@@ -407,7 +435,7 @@ function TeacherTestSubmissions() {
   ).length;
 
   // ==========================================
-  // DETAIL VIEW
+  // LOADING DETAIL
   // ==========================================
 
   if (detailLoading) {
@@ -420,16 +448,13 @@ function TeacherTestSubmissions() {
     );
   }
 
+  // ==========================================
+  // INDIVIDUAL SUBMISSION REVIEW PAGE
+  // ==========================================
+
   if (selectedSubmission) {
     const { attempt, test, student, questions } =
       selectedSubmission;
-
-    const writtenQuestions = questions.filter(
-      (question) =>
-        isSubjective(question.question_type) &&
-        question.response &&
-        String(question.response.answer?.text || "").trim()
-    );
 
     const canRelease =
       Number(attempt.pending_review_count) === 0 &&
@@ -450,6 +475,8 @@ function TeacherTestSubmissions() {
         >
           ← Back to submissions
         </button>
+
+        {/* HEADER */}
 
         <div className="tts-page-heading">
           <div>
@@ -479,11 +506,15 @@ function TeacherTestSubmissions() {
           </div>
         )}
 
+        {/* STUDENT SUMMARY */}
+
         <div className="tts-detail-summary">
 
           <div>
             <span>Student</span>
-            <strong>{student?.full_name || "Student"}</strong>
+            <strong>
+              {student?.full_name || "Student"}
+            </strong>
           </div>
 
           <div>
@@ -493,7 +524,9 @@ function TeacherTestSubmissions() {
 
           <div>
             <span>Submitted</span>
-            <strong>{formatDate(attempt.submitted_at)}</strong>
+            <strong>
+              {formatDate(attempt.submitted_at)}
+            </strong>
           </div>
 
           <div>
@@ -503,9 +536,13 @@ function TeacherTestSubmissions() {
 
         </div>
 
+        {/* RESULT SUMMARY */}
+
         <div className="tts-review-status">
+
           <div>
             <span>Objective marks</span>
+
             <strong>
               {attempt.objective_score ?? 0}
             </strong>
@@ -513,6 +550,7 @@ function TeacherTestSubmissions() {
 
           <div>
             <span>Written answers pending</span>
+
             <strong>
               {attempt.pending_review_count ?? 0}
             </strong>
@@ -520,23 +558,31 @@ function TeacherTestSubmissions() {
 
           <div>
             <span>Result</span>
+
             <strong>
               {attempt.results_released
-                ? "Released"
+                ? Number(attempt.pending_review_count) > 0
+                  ? "Partial release"
+                  : "Released"
                 : "Not released"}
             </strong>
           </div>
+
         </div>
+
+        {/* QUESTIONS */}
 
         <div className="tts-question-list">
 
           {questions.map((question, index) => {
             const response = question.response;
+
             const subjective = isSubjective(
               question.question_type
             );
 
-            const draft = gradeDrafts[question.id] || {};
+            const draft =
+              gradeDrafts[question.id] || {};
 
             return (
               <article
@@ -544,7 +590,10 @@ function TeacherTestSubmissions() {
                 key={question.id}
               >
 
+                {/* QUESTION HEADING */}
+
                 <div className="tts-question-top">
+
                   <div>
                     <span className="tts-question-number">
                       QUESTION {index + 1}
@@ -556,9 +605,13 @@ function TeacherTestSubmissions() {
                   <span className="tts-marks-pill">
                     {question.marks} marks
                   </span>
+
                 </div>
 
+                {/* STUDENT ANSWER */}
+
                 <div className="tts-answer-box">
+
                   <span>STUDENT'S ANSWER</span>
 
                   <p>
@@ -567,10 +620,14 @@ function TeacherTestSubmissions() {
                       response?.answer
                     )}
                   </p>
+
                 </div>
+
+                {/* OBJECTIVE QUESTION RESULT */}
 
                 {!subjective && (
                   <div className="tts-correct-answer">
+
                     <span>CORRECT ANSWER</span>
 
                     <p>
@@ -582,7 +639,8 @@ function TeacherTestSubmissions() {
 
                     <strong>
                       Awarded:{" "}
-                      {response?.marks_awarded ?? 0} / {question.marks}
+                      {response?.marks_awarded ?? 0} /{" "}
+                      {question.marks}
                     </strong>
 
                     <span>
@@ -590,14 +648,20 @@ function TeacherTestSubmissions() {
                         ? "✓ Correct"
                         : "✗ Incorrect or unanswered"}
                     </span>
+
                   </div>
                 )}
+
+                {/* WRITTEN QUESTION CORRECTION */}
 
                 {subjective && (
                   <div className="tts-manual-review">
 
                     <div className="tts-model-answer">
-                      <span>TEACHER'S MARKING GUIDE</span>
+
+                      <span>
+                        TEACHER'S MARKING GUIDE
+                      </span>
 
                       <p>
                         {getCorrectAnswerText(
@@ -608,51 +672,35 @@ function TeacherTestSubmissions() {
 
                       {question.answer_key?.correct_answer?.keywords?.length > 0 && (
                         <p>
-                          <strong>Important keywords:</strong>{" "}
+                          <strong>
+                            Important keywords:
+                          </strong>{" "}
                           {question.answer_key.correct_answer.keywords.join(", ")}
                         </p>
                       )}
+
                     </div>
 
                     {response ? (
-                      <>
-                        <label>
-                          Marks awarded (maximum {question.marks})
+                      <label>
+                        Marks awarded (maximum {question.marks})
 
-                          <input
-                            type="number"
-                            min="0"
-                            max={question.marks}
-                            step="0.5"
-                            value={draft.marks_awarded ?? ""}
-                            onChange={(event) =>
-                              updateGrade(
-                                question.id,
-                                "marks_awarded",
-                                event.target.value
-                              )
-                            }
-                            placeholder="Enter marks"
-                          />
-                        </label>
-
-                        <label>
-                          Teacher feedback
-
-                          <textarea
-                            rows={3}
-                            value={draft.teacher_feedback || ""}
-                            onChange={(event) =>
-                              updateGrade(
-                                question.id,
-                                "teacher_feedback",
-                                event.target.value
-                              )
-                            }
-                            placeholder="Write feedback for the student..."
-                          />
-                        </label>
-                      </>
+                        <input
+                          type="number"
+                          min="0"
+                          max={question.marks}
+                          step="0.5"
+                          value={draft.marks_awarded ?? ""}
+                          onChange={(event) =>
+                            updateGrade(
+                              question.id,
+                              "marks_awarded",
+                              event.target.value
+                            )
+                          }
+                          placeholder="Enter marks"
+                        />
+                      </label>
                     ) : (
                       <div className="tts-unanswered">
                         Student did not answer this question.
@@ -663,11 +711,44 @@ function TeacherTestSubmissions() {
                   </div>
                 )}
 
+                {/* FEEDBACK FOR ALL ANSWERED QUESTIONS */}
+
+                {response && (
+                  <div className="tts-manual-review tts-feedback-section">
+
+                    <label>
+                      💬 Teacher Feedback for Question {index + 1}
+
+                      <textarea
+                        rows={4}
+                        value={draft.teacher_feedback || ""}
+                        onChange={(event) =>
+                          updateGrade(
+                            question.id,
+                            "teacher_feedback",
+                            event.target.value
+                          )
+                        }
+                        placeholder="Write your explanation, correction or suggestions for the student..."
+                      />
+
+                    </label>
+
+                    <small>
+                      This feedback will be available to the
+                      student when the result is released.
+                    </small>
+
+                  </div>
+                )}
+
               </article>
             );
           })}
 
         </div>
+
+        {/* SAVE AND RELEASE */}
 
         <div className="tts-review-actions">
 
@@ -691,7 +772,9 @@ function TeacherTestSubmissions() {
               onClick={() => saveReview(false)}
               disabled={saving}
             >
-              {saving ? "Saving..." : "Save Corrections"}
+              {saving
+                ? "Saving..."
+                : "Save Corrections"}
             </button>
 
             {test.result_release === "manual" &&
@@ -723,13 +806,16 @@ function TeacherTestSubmissions() {
   }
 
   // ==========================================
-  // SUBMISSION LIST
+  // SUBMISSIONS LIST PAGE
   // ==========================================
 
   return (
     <section className="teacher-test-submissions">
 
+      {/* HEADER */}
+
       <div className="tts-page-heading">
+
         <div>
           <span className="tts-eyebrow">
             LEARÑOVA • TEACHER SPACE
@@ -738,17 +824,22 @@ function TeacherTestSubmissions() {
           <h2>📋 Test Submissions</h2>
 
           <p>
-            View student attempts, correct written answers and release results.
+            View student attempts, correct written answers
+            and release results.
           </p>
         </div>
 
         <span className="tts-heading-icon">📝</span>
+
       </div>
+
+      {/* SUMMARY CARDS */}
 
       <div className="tts-summary-grid">
 
         <article>
           <span>📚</span>
+
           <div>
             <p>Total Submissions</p>
             <strong>{submissions.length}</strong>
@@ -757,6 +848,7 @@ function TeacherTestSubmissions() {
 
         <article>
           <span>✏️</span>
+
           <div>
             <p>Awaiting Correction</p>
             <strong>{pendingCount}</strong>
@@ -765,6 +857,7 @@ function TeacherTestSubmissions() {
 
         <article>
           <span>🎉</span>
+
           <div>
             <p>Results Released</p>
             <strong>{releasedCount}</strong>
@@ -773,12 +866,18 @@ function TeacherTestSubmissions() {
 
       </div>
 
+      {/* SUBMISSION TABLE */}
+
       <div className="tts-list-panel">
 
         <div className="tts-list-heading">
+
           <div>
             <h3>Student Attempts</h3>
-            <p>All submitted examinations and practice tests.</p>
+
+            <p>
+              All submitted examinations and practice tests.
+            </p>
           </div>
 
           <button
@@ -789,25 +888,44 @@ function TeacherTestSubmissions() {
           >
             ↻ Refresh
           </button>
+
         </div>
+
+        {/* SEARCH AND FILTER */}
 
         <div className="tts-toolbar">
 
           <input
             type="search"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) =>
+              setSearch(event.target.value)
+            }
             placeholder="Search student or test name..."
           />
 
           <select
             value={filter}
-            onChange={(event) => setFilter(event.target.value)}
+            onChange={(event) =>
+              setFilter(event.target.value)
+            }
           >
-            <option value="all">All submissions</option>
-            <option value="pending">Awaiting correction</option>
-            <option value="unreleased">Results not released</option>
-            <option value="released">Results released</option>
+            <option value="all">
+              All submissions
+            </option>
+
+            <option value="pending">
+              Awaiting correction
+            </option>
+
+            <option value="unreleased">
+              Results not released
+            </option>
+
+            <option value="released">
+              Results released
+            </option>
+
           </select>
 
         </div>
@@ -824,11 +942,16 @@ function TeacherTestSubmissions() {
           </p>
         ) : filteredSubmissions.length === 0 ? (
           <div className="tts-empty">
+
             <span>🌸</span>
+
             <h3>No submissions found</h3>
+
             <p>
-              Student submissions will appear here after they submit their tests.
+              Student submissions will appear here
+              after they submit their tests.
             </p>
+
           </div>
         ) : (
           <div className="tts-table-wrap">
@@ -847,17 +970,25 @@ function TeacherTestSubmissions() {
               </thead>
 
               <tbody>
+
                 {filteredSubmissions.map((item) => (
                   <tr key={item.id}>
 
                     <td>
-                      <strong>{item.student_name}</strong>
-                      <small>Attempt {item.attempt_number}</small>
+                      <strong>
+                        {item.student_name}
+                      </strong>
+
+                      <small>
+                        Attempt {item.attempt_number}
+                      </small>
                     </td>
 
                     <td>{item.test_title}</td>
 
-                    <td>{formatDate(item.submitted_at)}</td>
+                    <td>
+                      {formatDate(item.submitted_at)}
+                    </td>
 
                     <td>
                       {item.results_released
@@ -886,7 +1017,9 @@ function TeacherTestSubmissions() {
                       <button
                         type="button"
                         className="tts-view-button"
-                        onClick={() => openSubmission(item)}
+                        onClick={() =>
+                          openSubmission(item)
+                        }
                       >
                         Review →
                       </button>
@@ -894,6 +1027,7 @@ function TeacherTestSubmissions() {
 
                   </tr>
                 ))}
+
               </tbody>
 
             </table>
