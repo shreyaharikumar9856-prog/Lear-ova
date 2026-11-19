@@ -27,6 +27,63 @@ function getCurrentMonth() {
   return getLocalDate().slice(0, 7);
 }
 
+const WEEKDAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+// Parse a YYYY-MM-DD date in local-calendar terms without UTC timezone shifts.
+function getWeekdayForDate(dateString) {
+  if (!dateString) return "";
+  const [year, month, day] = dateString.split("-").map(Number);
+  if (!year || !month || !day) return "";
+  return WEEKDAYS[new Date(year, month - 1, day).getDay()];
+}
+
+function getScheduledStudentIds(students, schedules, dateString) {
+  const weekday = getWeekdayForDate(dateString);
+  if (!weekday) return [];
+
+  const todaysSchedules = schedules.filter(
+    (schedule) =>
+      String(schedule.day_of_week || "").trim().toLowerCase() ===
+      weekday.toLowerCase()
+  );
+
+  const hasAllStudentClass = todaysSchedules.some(
+    (schedule) => schedule.student_id === null || schedule.student_id === undefined
+  );
+
+  const scheduledIds = new Set(
+    todaysSchedules
+      .filter((schedule) => schedule.student_id !== null && schedule.student_id !== undefined)
+      .map((schedule) => String(schedule.student_id))
+  );
+
+  return students.filter(
+    (student) => hasAllStudentClass || scheduledIds.has(String(student.id))
+  ).map((student) => student.id);
+}
+
+function isStudentScheduledOnDate(studentId, dateString, schedules) {
+  const weekday = getWeekdayForDate(dateString).toLowerCase();
+  if (!weekday) return false;
+
+  return schedules.some((schedule) => {
+    const sameDay =
+      String(schedule.day_of_week || "").trim().toLowerCase() === weekday;
+    const allStudents =
+      schedule.student_id === null || schedule.student_id === undefined;
+    const sameStudent = String(schedule.student_id) === String(studentId);
+    return sameDay && (allStudents || sameStudent);
+  });
+}
+
 const teacherMenu = [
   { id: "Overview", icon: "🏠", label: "Overview" },
   { id: "Students", icon: "👩‍🎓", label: "Students" },
@@ -85,6 +142,9 @@ function TeacherDashboard({ onLogout }) {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [timetableSchedules, setTimetableSchedules] = useState([]);
+  const [timetableLoading, setTimetableLoading] = useState(true);
+  const [timetableError, setTimetableError] = useState("");
   const [newStudentName, setNewStudentName] = useState("");
   const [newStudentPassword, setNewStudentPassword] = useState("");
   const [creatingStudent, setCreatingStudent] = useState(false);
@@ -131,12 +191,68 @@ function TeacherDashboard({ onLogout }) {
     };
   }, []);
 
-  // Load attendance for the selected date.
+  // Load timetable schedules used to determine which students have class.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchTimetableSchedules() {
+      setTimetableLoading(true);
+      setTimetableError("");
+
+      const { data, error: fetchError } = await supabase
+        .from("timetable")
+        .select("id, student_id, day_of_week, subject, start_time, end_time")
+        .order("start_time", { ascending: true });
+
+      if (cancelled) return;
+
+      if (fetchError) {
+        setTimetableError(fetchError.message);
+        setTimetableSchedules([]);
+      } else {
+        setTimetableSchedules(data || []);
+      }
+
+      setTimetableLoading(false);
+    }
+
+    fetchTimetableSchedules();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const scheduledStudentIds = getScheduledStudentIds(
+    students,
+    timetableSchedules,
+    attendanceDate
+  );
+  const scheduledStudents = students.filter((student) =>
+    scheduledStudentIds.some((id) => String(id) === String(student.id))
+  );
+
+  // Load attendance for the selected date, but only retain records for
+  // students who are actually scheduled on that date.
   useEffect(() => {
     let cancelled = false;
 
     async function fetchAttendance() {
       setAttendanceMessage("");
+
+      if (timetableLoading) return;
+      if (timetableError) {
+        setAttendanceMessage(`Unable to load timetable: ${timetableError}`);
+        setAttendance({});
+        return;
+      }
+
+      const todaysStudentIds = getScheduledStudentIds(
+        students,
+        timetableSchedules,
+        attendanceDate
+      ).map(String);
+      const scheduledIdSet = new Set(todaysStudentIds);
 
       const { data, error: fetchError } = await supabase
         .from("attendance")
@@ -153,6 +269,7 @@ function TeacherDashboard({ onLogout }) {
 
       const records = {};
       (data || []).forEach((record) => {
+        if (!scheduledIdSet.has(String(record.student_id))) return;
         records[record.student_id] = {
           status: record.status,
           remarks: record.remarks || "",
@@ -167,7 +284,7 @@ function TeacherDashboard({ onLogout }) {
     return () => {
       cancelled = true;
     };
-  }, [attendanceDate]);
+  }, [attendanceDate, students, timetableSchedules, timetableLoading, timetableError]);
 
   // Load attendance records for the selected month.
   useEffect(() => {
@@ -213,6 +330,14 @@ function TeacherDashboard({ onLogout }) {
       cancelled = true;
     };
   }, [reportMonth]);
+
+  const validReportRecords = reportRecords.filter((record) =>
+    isStudentScheduledOnDate(
+      record.student_id,
+      record.attendance_date,
+      timetableSchedules
+    )
+  );
 
   function updateAttendance(studentId, field, value) {
     setAttendance((previous) => ({
@@ -301,13 +426,27 @@ function TeacherDashboard({ onLogout }) {
     setSaving(true);
     setAttendanceMessage("");
 
-    if (!students.length) {
-      setAttendanceMessage("There are no students to mark attendance for.");
+    if (timetableLoading) {
+      setAttendanceMessage("Please wait while the timetable is loading.");
       setSaving(false);
       return;
     }
 
-    const unmarkedStudents = students.filter(
+    if (timetableError) {
+      setAttendanceMessage(`Unable to save attendance because the timetable could not be loaded: ${timetableError}`);
+      setSaving(false);
+      return;
+    }
+
+    if (!scheduledStudents.length) {
+      setAttendanceMessage(
+        `No classes are scheduled for ${getWeekdayForDate(attendanceDate)}. No attendance is required today.`
+      );
+      setSaving(false);
+      return;
+    }
+
+    const unmarkedStudents = scheduledStudents.filter(
       (student) => !attendance[student.id]?.status
     );
 
@@ -319,7 +458,7 @@ function TeacherDashboard({ onLogout }) {
       return;
     }
 
-    const records = students.map((student) => ({
+    const records = scheduledStudents.map((student) => ({
       student_id: student.id,
       attendance_date: attendanceDate,
       status: attendance[student.id].status,
@@ -356,7 +495,7 @@ function TeacherDashboard({ onLogout }) {
     setSaving(false);
   }
 
-  function getStudentStats(studentId, records = reportRecords) {
+  function getStudentStats(studentId, records = validReportRecords) {
     const studentRecords = records.filter(
       (record) => record.student_id === studentId
     );
@@ -379,19 +518,19 @@ function TeacherDashboard({ onLogout }) {
     };
   }
 
-  const presentCount = students.filter(
+  const presentCount = scheduledStudents.filter(
     (student) => attendance[student.id]?.status === "Present"
   ).length;
 
-  const absentCount = students.filter(
+  const absentCount = scheduledStudents.filter(
     (student) => attendance[student.id]?.status === "Absent"
   ).length;
 
-  const totalPresent = reportRecords.filter(
+  const totalPresent = validReportRecords.filter(
     (record) => record.status === "Present"
   ).length;
 
-  const totalAbsent = reportRecords.filter(
+  const totalAbsent = validReportRecords.filter(
     (record) => record.status === "Absent"
   ).length;
 
@@ -400,7 +539,7 @@ function TeacherDashboard({ onLogout }) {
     ? Math.round((totalPresent / totalRecorded) * 100)
     : null;
 
-  const sortedDailyRecords = [...reportRecords].sort((a, b) => {
+  const sortedDailyRecords = [...validReportRecords].sort((a, b) => {
     const dateComparison = b.attendance_date.localeCompare(a.attendance_date);
     if (dateComparison !== 0) return dateComparison;
 
@@ -536,10 +675,13 @@ function TeacherDashboard({ onLogout }) {
         <div className="attendance-summary teacher-attendance-summary">
           <span>🟢 Present: {presentCount}</span>
           <span>🔴 Absent: {absentCount}</span>
-          <span>⚪ Unmarked: {students.length - presentCount - absentCount}</span>
+          <span>⚪ Unmarked: {Math.max(0, scheduledStudents.length - presentCount - absentCount)}</span>
+          <span>📚 Scheduled: {scheduledStudents.length}</span>
         </div>
 
-        {!loading && !error && students.length > 0 && (
+        {timetableLoading && <p className="teacher-state">Loading timetable...</p>}
+        {timetableError && <p className="teacher-error">Unable to load timetable: {timetableError}</p>}
+        {!loading && !error && !timetableLoading && !timetableError && scheduledStudents.length > 0 && (
           <div className="teacher-table-wrap">
             <table className="teacher-table">
               <thead>
@@ -550,7 +692,7 @@ function TeacherDashboard({ onLogout }) {
                 </tr>
               </thead>
               <tbody>
-                {students.map((student) => (
+                {scheduledStudents.map((student) => (
                   <tr key={student.id}>
                     <td>{student.full_name}</td>
                     <td>
@@ -586,14 +728,19 @@ function TeacherDashboard({ onLogout }) {
         {loading && <p className="teacher-state">Loading students...</p>}
         {error && <p className="teacher-error">{error}</p>}
         {!loading && students.length === 0 && !error && (
-          <p className="teacher-state">No students available to mark.</p>
+          <p className="teacher-state">No students are registered yet.</p>
+        )}
+        {!loading && !error && !timetableLoading && !timetableError && students.length > 0 && scheduledStudents.length === 0 && (
+          <p className="teacher-state">
+            🌿 No classes are scheduled for {getWeekdayForDate(attendanceDate)}. Attendance is not required, and this date will not affect attendance percentages.
+          </p>
         )}
 
         <button
           type="button"
           className="teacher-primary-button"
           onClick={saveAttendance}
-          disabled={saving || loading || !!error || students.length === 0}
+          disabled={saving || loading || !!error || timetableLoading || !!timetableError || scheduledStudents.length === 0}
         >
           {saving ? "Saving..." : "Save Attendance"}
         </button>
@@ -613,7 +760,7 @@ function TeacherDashboard({ onLogout }) {
         <div className="teacher-panel-heading">
           <div>
             <h2>📊 Attendance Reports</h2>
-            <p>Attendance percentages are based only on dates with recorded attendance.</p>
+            <p>Only scheduled class days are included in attendance totals and percentages.</p>
           </div>
         </div>
 
@@ -724,21 +871,21 @@ function TeacherDashboard({ onLogout }) {
             <span>🟢</span>
             <div>
               <p>Present Today</p>
-              <strong>{loading ? "—" : presentCount}</strong>
+              <strong>{loading || timetableLoading ? "—" : presentCount}</strong>
             </div>
           </article>
           <article className="teacher-overview-stat teacher-stat-peach">
             <span>🔴</span>
             <div>
               <p>Absent Today</p>
-              <strong>{loading ? "—" : absentCount}</strong>
+              <strong>{loading || timetableLoading ? "—" : absentCount}</strong>
             </div>
           </article>
           <article className="teacher-overview-stat teacher-stat-blue">
             <span>⚪</span>
             <div>
               <p>Not Marked</p>
-              <strong>{loading ? "—" : Math.max(0, students.length - presentCount - absentCount)}</strong>
+              <strong>{loading || timetableLoading ? "—" : Math.max(0, scheduledStudents.length - presentCount - absentCount)}</strong>
             </div>
           </article>
         </section>
