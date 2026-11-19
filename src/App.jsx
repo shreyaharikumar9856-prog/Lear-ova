@@ -9,7 +9,7 @@ import StudentSubjects from "./StudentSubjects";
 import StudentAnnouncements from "./StudentAnnouncements";
 import StudentTests from "./StudentTests";
 import StudentLeaderboard from "./StudentLeaderboard";
-import "./App.css"; 
+import "./App.css";
 
 function formatScheduleTime(value) {
   if (!value) return "Time TBA";
@@ -48,10 +48,13 @@ function App() {
   const [role, setRole] = useState(null);
   const [checkingRole, setCheckingRole] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+
   // Always open students on the home dashboard after a fresh page load.
   const [activeTab, setActiveTab] = useState("Dashboard");
+
   const [selectedAvatar, setSelectedAvatar] = useState(null);
   const [studentName, setStudentName] = useState("");
+
   const [dashboardData, setDashboardData] = useState({
     loading: true,
     coins: 0,
@@ -97,7 +100,7 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-    // Logout function
+  // Logout function
   async function handleLogout() {
     const { error } = await supabase.auth.signOut();
 
@@ -111,6 +114,7 @@ function App() {
     setRole(null);
     setSelectedAvatar(null);
   }
+
   // Fetch the user's role
   useEffect(() => {
     let cancelled = false;
@@ -170,7 +174,6 @@ function App() {
       }
 
       try {
-        // Find the logged-in student's record
         const { data: student, error: studentError } = await supabase
           .from("students")
           .select("id")
@@ -180,10 +183,7 @@ function App() {
         if (cancelled) return;
 
         if (studentError) {
-          console.error(
-            "Error fetching student:",
-            studentError.message
-          );
+          console.error("Error fetching student:", studentError.message);
           setSelectedAvatar(null);
           return;
         }
@@ -193,7 +193,6 @@ function App() {
           return;
         }
 
-        // Function to load the currently selected avatar
         const loadSelectedAvatar = async () => {
           const { data, error } = await supabase
             .from("student_avatars")
@@ -216,12 +215,10 @@ function App() {
           setSelectedAvatar(data?.avatars ?? null);
         };
 
-        // Load avatar initially
         await loadSelectedAvatar();
 
         if (cancelled) return;
 
-        // Subscribe once to changes in this student's avatar records
         avatarSubscription = supabase
           .channel(`selected-avatar-${student.id}`)
           .on(
@@ -239,10 +236,7 @@ function App() {
           .subscribe();
       } catch (error) {
         if (!cancelled) {
-          console.error(
-            "Unable to load selected avatar:",
-            error
-          );
+          console.error("Unable to load selected avatar:", error);
           setSelectedAvatar(null);
         }
       }
@@ -291,10 +285,12 @@ function App() {
 
       if (studentError || !student) {
         setStudentName("");
+
         console.error(
           "Unable to load student dashboard profile:",
           studentError?.message || "Student profile not found."
         );
+
         setDashboardData({
           loading: false,
           coins: null,
@@ -315,12 +311,15 @@ function App() {
 
       async function loadDashboardData() {
         const now = new Date();
+
         const monthStart = `${now.getFullYear()}-${String(
           now.getMonth() + 1
         ).padStart(2, "0")}-01`;
+
         const todayName = new Intl.DateTimeFormat("en-US", {
           weekday: "long",
         }).format(now);
+
         const todayShort = todayName.slice(0, 3).toLowerCase();
 
         const [
@@ -345,7 +344,9 @@ function App() {
 
           supabase
             .from("student_subjects")
-            .select("subject_id, subjects(id, subject_name, description, subject_icon)")
+            .select(
+              "subject_id, subjects(id, subject_name, description, subject_icon)"
+            )
             .eq("student_id", student.id),
 
           supabase
@@ -386,6 +387,7 @@ function App() {
         });
 
         const transactions = transactionsResult.data || [];
+
         const calculatedCoins = transactions.reduce(
           (total, item) =>
             total +
@@ -420,7 +422,7 @@ function App() {
           coins: errors.coins ? null : Math.max(0, calculatedCoins),
           classesAttended: errors.attendance
             ? null
-            : (attendanceResult.count ?? 0),
+            : attendanceResult.count ?? 0,
           subjectCount: errors.subjects ? null : subjects.length,
           achievementCount: errors.achievements
             ? null
@@ -435,6 +437,7 @@ function App() {
       }
 
       await loadDashboardData();
+
       if (cancelled) return;
 
       // Keep the dashboard fresh when teachers update student information.
@@ -506,6 +509,7 @@ function App() {
 
     return () => {
       cancelled = true;
+
       if (dashboardChannel) {
         supabase.removeChannel(dashboardChannel);
       }
@@ -527,8 +531,8 @@ function App() {
 
   // Teacher dashboard
   if (role === "teacher") {
-  return <TeacherDashboard onLogout={handleLogout} />;
-}
+    return <TeacherDashboard onLogout={handleLogout} />;
+  }
 
   if (role !== "student") {
     return <p>Unable to verify your account role.</p>;
@@ -546,7 +550,6 @@ function App() {
     { icon: "🥇", name: "Leaderboard" },
     { icon: "🎮", name: "Fun Zone" },
     { icon: "💌", name: "Messages" },
-
   ];
 
   return (
@@ -613,7 +616,8 @@ function App() {
         >
           ⚙️ Settings
         </button>
-                <button
+
+        <button
           type="button"
           className="settings-button"
           onClick={handleLogout}
@@ -664,87 +668,134 @@ function App() {
         {/* Student Dashboard */}
         {activeTab === "Dashboard" ? (
           <>
+            <StudentLeaderboard
+              compact
+              onViewAll={() => setActiveTab("Leaderboard")}
+            />
 
-            <div className="dashboard-leaderboard-layout">
-  <div className="dashboard-leaderboard-content">
-    <StudentLeaderboard
-      compact
-      onViewAll={() => setActiveTab("Leaderboard")}
-    />
-  </div>
-
-  <div className="dashboard-teddy-bear" aria-label="Learnova teddy bear">
-    🐻
-  </div>
-</div>
-<section className="panel tasks-panel dashboard-timetable-panel">
-                <div className="panel-heading">
-                  <div>
-                    <h2>Today's plan 🌼</h2>
-                    <p>One thing at a time.</p>
-                  </div>
-
-                  <span className="plan-date">TODAY</span>
+            <section className="panel tasks-panel dashboard-timetable-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Today's plan 🌼</h2>
+                  <p>One thing at a time.</p>
                 </div>
 
-                {dashboardData.loading ? (
-                  <p>Loading today's timetable...</p>
-                ) : dashboardData.errors.timetable ? (
-                  <p>Unable to load today's timetable.</p>
-                ) : dashboardData.todayClasses.length === 0 ? (
-                  <p className="no-classes-message">
-                    No classes are scheduled for today. Enjoy your day! 🌷
-                  </p>
-                ) : (
-                  dashboardData.todayClasses.map((item) => (
-                    <div className="task-item" key={item.id}>
-                      <div className="task-time">
-                        {formatScheduleTime(item.start_time)}
-                        {item.end_time
-                          ? ` – ${formatScheduleTime(item.end_time)}`
-                          : ""}
-                      </div>
+                <span className="plan-date">TODAY</span>
+              </div>
 
-                      <div className="task-details">
-                        <h3>{item.subject || "Class"}</h3>
-                        <p>
-                          {item.teacher_name
-                            ? `Teacher: ${item.teacher_name}`
-                            : item.notes || "Scheduled class"}
-                        </p>
-                        {item.meeting_link && (
-                          <a
-                            className="task-meeting-link"
-                            href={item.meeting_link}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Join class →
-                          </a>
-                        )}
-                      </div>
-
-                      <span className="task-emoji">📚</span>
+              {dashboardData.loading ? (
+                <p>Loading today's timetable...</p>
+              ) : dashboardData.errors.timetable ? (
+                <p>Unable to load today's timetable.</p>
+              ) : dashboardData.todayClasses.length === 0 ? (
+                <p className="no-classes-message">
+                  No classes are scheduled for today. Enjoy your day! 🌷
+                </p>
+              ) : (
+                dashboardData.todayClasses.map((item) => (
+                  <div className="task-item" key={item.id}>
+                    <div className="task-time">
+                      {formatScheduleTime(item.start_time)}
+                      {item.end_time
+                        ? ` – ${formatScheduleTime(item.end_time)}`
+                        : ""}
                     </div>
-                  ))
-                )}
+
+                    <div className="task-details">
+                      <h3>{item.subject || "Class"}</h3>
+                      <p>
+                        {item.teacher_name
+                          ? `Teacher: ${item.teacher_name}`
+                          : item.notes || "Scheduled class"}
+                      </p>
+
+                      {item.meeting_link && (
+                        <a
+                          className="task-meeting-link"
+                          href={item.meeting_link}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Join class →
+                        </a>
+                      )}
+                    </div>
+
+                    <span className="task-emoji">📚</span>
+                  </div>
+                ))
+              )}
+
+              <button
+                className="secondary-button"
+                onClick={() => setActiveTab("Timetable")}
+              >
+                See my timetable →
+              </button>
+            </section>
+
+            {/* RESTORED ORIGINAL LEARNING BANNER */}
+            <section className="hero-card">
+              <div className="hero-text">
+                <span className="tiny-tag">
+                  ✦ YOUR LEARNING JOURNEY ✦
+                </span>
+
+                <h2>
+                  Small steps,
+                  <br />
+                  <span>big dreams!</span>
+                </h2>
+
+                <p>
+                  Every lesson you learn brings you closer to the amazing
+                  things you can become.
+                </p>
 
                 <button
-                  className="secondary-button"
-                  onClick={() => setActiveTab("Timetable")}
+                  className="primary-button"
+                  onClick={() => setActiveTab("My Subjects")}
                 >
-                  See my timetable →
+                  Explore my subjects <span>→</span>
                 </button>
-              </section>
+              </div>
 
-<section className="stats-grid">
+              <div className="hero-illustration">
+                <div className="sun-circle">☀️</div>
+
+                {selectedAvatar?.avatar_image ? (
+                  <img
+                    src={selectedAvatar.avatar_image}
+                    alt={
+                      selectedAvatar.avatar_name ||
+                      "My selected avatar"
+                    }
+                    className="hero-character-image"
+                  />
+                ) : (
+                  <div className="hero-bear">🐻</div>
+                )}
+
+                <div className="floating-star">⭐</div>
+
+                <div className="hero-caption">
+                  You're doing amazing!
+                </div>
+              </div>
+
+              <div className="hero-decoration decoration-one"></div>
+              <div className="hero-decoration decoration-two"></div>
+            </section>
+
+            <section className="stats-grid">
               <div className="stat-card pink">
                 <div className="stat-icon">🪙</div>
                 <p>My coins this month</p>
                 <h2>
                   {dashboardData.loading
                     ? "…"
-                    : dashboardData.coins ?? "—"} <span>coins</span>
+                    : dashboardData.coins ?? "—"}{" "}
+                  <span>coins</span>
                 </h2>
                 <small>
                   {dashboardData.errors.coins
@@ -759,7 +810,8 @@ function App() {
                 <h2>
                   {dashboardData.loading
                     ? "…"
-                    : dashboardData.classesAttended ?? "—"} <span>classes</span>
+                    : dashboardData.classesAttended ?? "—"}{" "}
+                  <span>classes</span>
                 </h2>
                 <small>
                   {dashboardData.errors.attendance
@@ -774,7 +826,8 @@ function App() {
                 <h2>
                   {dashboardData.loading
                     ? "…"
-                    : dashboardData.subjectCount ?? "—"} <span>subjects</span>
+                    : dashboardData.subjectCount ?? "—"}{" "}
+                  <span>subjects</span>
                 </h2>
                 <small>
                   {dashboardData.errors.subjects
@@ -789,7 +842,8 @@ function App() {
                 <h2>
                   {dashboardData.loading
                     ? "…"
-                    : dashboardData.achievementCount ?? "—"} <span>badges</span>
+                    : dashboardData.achievementCount ?? "—"}{" "}
+                  <span>badges</span>
                 </h2>
                 <small>
                   {dashboardData.errors.achievements
@@ -799,48 +853,49 @@ function App() {
               </div>
             </section>
 
-<section className="panel subjects-panel dashboard-subjects-panel">
-                <div className="panel-heading">
-                  <div>
-                    <h2>My subjects 📚</h2>
-                    <p>A little learning every day!</p>
-                  </div>
-
-                  <button
-                    className="text-button"
-                    onClick={() => setActiveTab("My Subjects")}
-                  >
-                    View all →
-                  </button>
+            <section className="panel subjects-panel dashboard-subjects-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>My subjects 📚</h2>
+                  <p>A little learning every day!</p>
                 </div>
 
-                <div className="subject-list">
-                  {dashboardData.loading ? (
-                    <p>Loading your subjects...</p>
-                  ) : dashboardData.errors.subjects ? (
-                    <p>Unable to load your assigned subjects.</p>
-                  ) : dashboardData.subjects.length === 0 ? (
-                    <p>No subjects have been assigned yet.</p>
-                  ) : (
-                    dashboardData.subjects.slice(0, 4).map((subject) => (
-                      <div className="subject-row" key={subject.id}>
-                        <div className="subject-icon">
-                          {getSubjectIcon(subject)}
-                        </div>
+                <button
+                  className="text-button"
+                  onClick={() => setActiveTab("My Subjects")}
+                >
+                  View all →
+                </button>
+              </div>
 
-                        <div className="subject-info">
-                          <h3>{subject.subject_name}</h3>
-                          <p>
-                            {subject.description || "Assigned to your learning plan."}
-                          </p>
-                        </div>
+              <div className="subject-list">
+                {dashboardData.loading ? (
+                  <p>Loading your subjects...</p>
+                ) : dashboardData.errors.subjects ? (
+                  <p>Unable to load your assigned subjects.</p>
+                ) : dashboardData.subjects.length === 0 ? (
+                  <p>No subjects have been assigned yet.</p>
+                ) : (
+                  dashboardData.subjects.slice(0, 4).map((subject) => (
+                    <div className="subject-row" key={subject.id}>
+                      <div className="subject-icon">
+                        {getSubjectIcon(subject)}
                       </div>
-                    ))
-                  )}
-                </div>
-              </section>
 
-<section className="panel dashboard-announcements">
+                      <div className="subject-info">
+                        <h3>{subject.subject_name}</h3>
+                        <p>
+                          {subject.description ||
+                            "Assigned to your learning plan."}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+
+            <section className="panel dashboard-announcements">
               <div className="panel-heading">
                 <div>
                   <h2>📢 Latest Announcements</h2>
@@ -882,7 +937,7 @@ function App() {
               )}
             </section>
 
-<section className="bottom-banner">
+            <section className="bottom-banner">
               <div className="banner-emoji">🌈</div>
 
               <div>
@@ -896,21 +951,21 @@ function App() {
               <div className="banner-stars">✦ ✧ ✦</div>
             </section>
           </>
-       ) : activeTab === "My Subjects" ? (
-         <StudentSubjects />
-       ) : activeTab === "Homework" ? (
-         <StudentHomework />
-       ) : activeTab === "Timetable" ? (
-         <StudentTimetable />
-      ) : activeTab === "My Tests" ? (
-         <StudentTests />
-       ) : activeTab === "Achievements" ? (
-         <StudentGamification />
-       ) : activeTab === "Leaderboard" ? (
-         <StudentLeaderboard />
-       ) : activeTab === "Announcements" ? (
-         <StudentAnnouncements />
-       ) : (
+        ) : activeTab === "My Subjects" ? (
+          <StudentSubjects />
+        ) : activeTab === "Homework" ? (
+          <StudentHomework />
+        ) : activeTab === "Timetable" ? (
+          <StudentTimetable />
+        ) : activeTab === "My Tests" ? (
+          <StudentTests />
+        ) : activeTab === "Achievements" ? (
+          <StudentGamification />
+        ) : activeTab === "Leaderboard" ? (
+          <StudentLeaderboard />
+        ) : activeTab === "Announcements" ? (
+          <StudentAnnouncements />
+        ) : (
           <section className="panel placeholder-panel">
             <div className="placeholder-emoji">
               {menuItems.find((item) => item.name === activeTab)?.icon ||
