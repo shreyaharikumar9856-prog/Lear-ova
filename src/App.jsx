@@ -730,59 +730,6 @@ function App() {
                 </button>
               </section>
 
-<section className="hero-card">
-              <div className="hero-text">
-                <span className="tiny-tag">
-                  ✦ YOUR LEARNING JOURNEY ✦
-                </span>
-
-                <h2>
-                  Small steps,
-                  <br />
-                  <span>big dreams!</span>
-                </h2>
-
-                <p>
-                  Every lesson you learn brings you closer to the amazing
-                  things you can become.
-                </p>
-
-                <button
-                  className="primary-button"
-                  onClick={() => setActiveTab("My Subjects")}
-                >
-                  Explore my subjects <span>→</span>
-                </button>
-              </div>
-
-              {/* Selected avatar illustration */}
-              <div className="hero-illustration">
-                <div className="sun-circle">☀️</div>
-
-                {selectedAvatar?.avatar_image ? (
-                  <img
-                    src={selectedAvatar.avatar_image}
-                    alt={
-                      selectedAvatar.avatar_name ||
-                      "My selected avatar"
-                    }
-                    className="hero-character-image"
-                  />
-                ) : (
-                  <div className="hero-bear">🐻</div>
-                )}
-
-                <div className="floating-star">⭐</div>
-
-                <div className="hero-caption">
-                  You're doing amazing!
-                </div>
-              </div>
-
-              <div className="hero-decoration decoration-one"></div>
-              <div className="hero-decoration decoration-two"></div>
-            </section>
-
 <section className="stats-grid">
               <div className="stat-card pink">
                 <div className="stat-icon">🪙</div>
