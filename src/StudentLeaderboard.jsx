@@ -51,7 +51,7 @@ function rankRows(rows) {
   });
 }
 
-export default function StudentLeaderboard() {
+export default function StudentLeaderboard({ compact = false, onViewAll }) {
   const [monthStart] = useState(getMonthStart);
   const [rows, setRows] = useState([]);
   const [currentStudentId, setCurrentStudentId] = useState(null);
@@ -115,19 +115,19 @@ export default function StudentLeaderboard() {
 
   if (loading) {
     return (
-      <section className="student-leaderboard">
+      <section className={`student-leaderboard ${compact ? "sl-compact" : ""}`}>
         <div className="sl-state">Loading the leaderboard… 🏆</div>
       </section>
     );
   }
 
   return (
-    <section className="student-leaderboard">
+    <section className={`student-leaderboard ${compact ? "sl-compact" : ""}`}>
       <header className="sl-header">
         <div>
           <span className="sl-eyebrow">LEARN • GROW • SHINE</span>
-          <h2>🏆 Learnova Leaderboard</h2>
-          <p>Celebrate your effort and see how far everyone has come.</p>
+          <h2>🏆 {compact ? "Monthly Leaderboard" : "Learnova Leaderboard"}</h2>
+          <p>{compact ? "See who is shining this month!" : "Celebrate your effort and see how far everyone has come."}</p>
         </div>
         <button
           type="button"
@@ -215,77 +215,99 @@ export default function StudentLeaderboard() {
         </div>
       )}
 
-      {!error && (
-        <div className="sl-list-card">
-          <div className="sl-list-heading">
-            <div>
-              <h3>Monthly rankings</h3>
-              <p>{rankedRows.length} learners on the board</p>
-            </div>
-            <span className="sl-sort-note">Highest coins first</span>
-          </div>
-
-          {rankedRows.length === 0 ? (
-            <div className="sl-state">
-              No students are available on the leaderboard yet.
-            </div>
-          ) : (
-            <div className="sl-table-wrap">
-              <table className="sl-table">
-                <thead>
-                  <tr>
-                    <th>Rank</th>
-                    <th>Student</th>
-                    <th>League</th>
-                    <th className="sl-coins-heading">Coins</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rankedRows.map((student) => {
-                    const isYou =
-                      String(student.student_id) === String(currentStudentId);
-
-                    return (
-                      <tr key={student.student_id} className={isYou ? "sl-current-row" : ""}>
-                        <td>
-                          <span className={`sl-rank-number ${student.rank <= 3 ? "top-rank" : ""}`}>
-                            {student.rank <= 3
-                              ? ["🥇", "🥈", "🥉"][student.rank - 1]
-                              : `#${student.rank}`}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="sl-student-cell">
-                            <span className="sl-small-avatar">
-                              {getInitials(student.full_name)}
-                            </span>
-                            <strong>
-                              {student.full_name}
-                              {isYou && <span className="sl-you-tag">YOU</span>}
-                            </strong>
-                          </div>
-                        </td>
-                        <td>
-                          <span className={`sl-league-badge ${student.leagueInfo.className}`}>
-                            {student.leagueInfo.icon} {student.leagueInfo.name}
-                          </span>
-                        </td>
-                        <td className="sl-coins-cell">{student.coins} 🪙</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+      {!error && rankedRows.length === 0 && (
+        <div className="sl-state">No students are available on the leaderboard yet.</div>
       )}
 
-      {!error && (
-        <p className="sl-footer-note">
-          Rankings are based on each learner’s net coins earned this month.
-          Keep learning, keep trying, and keep shining! ✨
-        </p>
+      {compact ? (
+        !error && (
+          <div className="sl-compact-actions">
+            <span>{rankedRows.length} learners are competing this month</span>
+            <button
+              type="button"
+              className="sl-view-all"
+              onClick={onViewAll}
+              disabled={!onViewAll}
+            >
+              View full leaderboard →
+            </button>
+          </div>
+        )
+      ) : (
+        <>
+          {!error && (
+            <div className="sl-list-card">
+              <div className="sl-list-heading">
+                <div>
+                  <h3>Monthly rankings</h3>
+                  <p>{rankedRows.length} learners on the board</p>
+                </div>
+                <span className="sl-sort-note">Highest coins first</span>
+              </div>
+
+              {rankedRows.length === 0 ? (
+                <div className="sl-state">
+                  No students are available on the leaderboard yet.
+                </div>
+              ) : (
+                <div className="sl-table-wrap">
+                  <table className="sl-table">
+                    <thead>
+                      <tr>
+                        <th>Rank</th>
+                        <th>Student</th>
+                        <th>League</th>
+                        <th className="sl-coins-heading">Coins</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rankedRows.map((student) => {
+                        const isYou =
+                          String(student.student_id) === String(currentStudentId);
+
+                        return (
+                          <tr key={student.student_id} className={isYou ? "sl-current-row" : ""}>
+                            <td>
+                              <span className={`sl-rank-number ${student.rank <= 3 ? "top-rank" : ""}`}>
+                                {student.rank <= 3
+                                  ? ["🥇", "🥈", "🥉"][student.rank - 1]
+                                  : `#${student.rank}`}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="sl-student-cell">
+                                <span className="sl-small-avatar">
+                                  {getInitials(student.full_name)}
+                                </span>
+                                <strong>
+                                  {student.full_name}
+                                  {isYou && <span className="sl-you-tag">YOU</span>}
+                                </strong>
+                              </div>
+                            </td>
+                            <td>
+                              <span className={`sl-league-badge ${student.leagueInfo.className}`}>
+                                {student.leagueInfo.icon} {student.leagueInfo.name}
+                              </span>
+                            </td>
+                            <td className="sl-coins-cell">{student.coins} 🪙</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!error && (
+            <p className="sl-footer-note">
+              Rankings are based on each learner’s net coins earned this month.
+              Keep learning, keep trying, and keep shining! ✨
+            </p>
+          )}
+        </>
       )}
     </section>
   );
