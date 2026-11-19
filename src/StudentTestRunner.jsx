@@ -14,6 +14,7 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [gradingResult, setGradingResult] = useState(null);
 
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
@@ -363,17 +364,62 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
         throw new Error(data.error);
       }
 
-      setSubmitted(true);
+     // ==========================================
+// AUTOMATIC GRADING
+// ==========================================
 
-      setStatusMessage(
-        trigger === "manual"
-          ? "Your test has been submitted successfully."
-          : "Your test was submitted automatically."
-      );
+let gradingData = null;
 
-      if (onSubmitted) {
-        onSubmitted(data);
-      }
+try {
+  const {
+    data: resultData,
+    error: gradingError,
+  } = await supabase.functions.invoke(
+    "grade-test-attempt",
+    {
+      body: {
+        attempt_id: attempt.id,
+      },
+    }
+  );
+
+  if (gradingError) throw gradingError;
+
+  if (resultData?.error) {
+    throw new Error(resultData.error);
+  }
+
+  gradingData = resultData;
+
+} catch (gradingError) {
+  console.error(
+    "Automatic grading failed:",
+    gradingError
+  );
+
+  gradingData = {
+    grading_pending: true,
+    results_released: false,
+  };
+}
+
+setGradingResult(gradingData);
+setSubmitted(true);
+
+setStatusMessage(
+  gradingData?.grading_pending
+    ? "Your submission was saved. Grading is awaiting processing."
+    : trigger === "manual"
+      ? "Your test has been submitted successfully."
+      : "Your test was submitted automatically."
+);
+
+if (onSubmitted) {
+  onSubmitted({
+    ...data,
+    grading: gradingData,
+  });
+}
 
     } catch (err) {
       console.error("Test submission failed:", err);
@@ -788,32 +834,132 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
   // ==========================================
 
   if (submitted) {
-    return (
-      <section className="student-runner-page">
-        <div className="runner-submitted-card">
-          <div className="runner-success-icon">✓</div>
+  return (
+    <section className="student-runner-page">
+      <div className="runner-submitted-card">
 
-          <h2>Test Submitted!</h2>
+        <div className="runner-success-icon">
+          ✓
+        </div>
 
-          <p>{statusMessage}</p>
+        <h2>Test Submitted!</h2>
+
+        <p>{statusMessage}</p>
+
+        <div className="runner-result-summary">
 
           <p>
-            Answered: {getAnsweredCount()} /{" "}
-            {questions.length}
+            <strong>Test:</strong> {test.title}
           </p>
 
-          <button
-            type="button"
-            className="runner-primary-button"
-            onClick={onBack}
-          >
-            Back to My Tests
-          </button>
-        </div>
-      </section>
-    );
-  }
+          <p>
+            <strong>Answered:</strong>{" "}
+            {getAnsweredCount()} / {questions.length}
+          </p>
 
+          {gradingResult?.grading_pending && (
+            <div className="runner-practice-note">
+              Your submission has been saved.
+              Automatic grading is pending.
+              Your result will be updated later.
+            </div>
+          )}
+
+          {!gradingResult?.grading_pending &&
+            gradingResult?.results_released && (
+              <div className="runner-result-box">
+
+                {gradingResult.pending_review_count > 0 ? (
+                  <>
+                    <h3>Objective Marks Available</h3>
+
+                    <strong>
+                      {gradingResult.objective_score}
+                    </strong>
+
+                    <p>
+                      Your written answers are awaiting teacher correction.
+                    </p>
+
+                    <p>
+                      Pending written questions:{" "}
+                      {gradingResult.pending_review_count}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3>Your Result</h3>
+
+                    <strong>
+                      {gradingResult.objective_score} / {test.total_marks}
+                    </strong>
+
+                    <p>Automatic grading completed.</p>
+                  </>
+                )}
+
+              </div>
+            )}
+
+          {!gradingResult?.grading_pending &&
+            !gradingResult?.results_released && (
+              <div className="runner-practice-note">
+                Your submission is recorded successfully.
+
+                <p>
+                  Your result will become available after teacher review
+                  or when the teacher releases it.
+                </p>
+              </div>
+            )}
+
+        </div>
+
+        <button
+          type="button"
+          className="runner-primary-button"
+          onClick={onBack}
+        >
+          Back to My Tests
+        </button>
+
+      </div>
+
+      <style>{`
+        .runner-result-summary {
+          margin: 22px 0;
+          text-align: left;
+          line-height: 1.7;
+        }
+
+        .runner-result-box {
+          margin-top: 20px;
+          padding: 22px;
+          border-radius: 14px;
+          background: #eef7f0;
+          text-align: center;
+        }
+
+        .runner-result-box h3 {
+          color: #547b60;
+          margin-bottom: 12px;
+        }
+
+        .runner-result-box strong {
+          display: block;
+          font-size: 32px;
+          color: #397b50;
+          margin: 12px 0;
+        }
+
+        .runner-result-box p {
+          color: #547b60;
+          font-size: 14px;
+        }
+      `}</style>
+    </section>
+  );
+}
   // ==========================================
   // TEST SCREEN
   // ==========================================
