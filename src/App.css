@@ -2374,3 +2374,34 @@ select,
 textarea {
   transition: all 0.2s ease;
 }
+.dashboard-leaderboard-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.dashboard-leaderboard-content {
+  min-width: 0;
+}
+
+.dashboard-teddy-bear {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 100px;
+  line-height: 1;
+}
+
+/* Smaller screens */
+@media (max-width: 600px) {
+  .dashboard-leaderboard-layout {
+    grid-template-columns: minmax(0, 1fr) 65px;
+    gap: 5px;
+  }
+
+  .dashboard-teddy-bear {
+    font-size: 55px;
+  }
+}
