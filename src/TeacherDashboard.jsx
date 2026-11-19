@@ -331,13 +331,10 @@ function TeacherDashboard({ onLogout }) {
     };
   }, [reportMonth]);
 
-  const validReportRecords = reportRecords.filter((record) =>
-    isStudentScheduledOnDate(
-      record.student_id,
-      record.attendance_date,
-      timetableSchedules
-    )
-  );
+  // Monthly reports use every saved attendance record.
+  // New records are already restricted to scheduled students when attendance is saved.
+  // This prevents later timetable edits from hiding historical attendance.
+  const validReportRecords = reportRecords;
 
   function updateAttendance(studentId, field, value) {
     setAttendance((previous) => ({
@@ -760,7 +757,7 @@ function TeacherDashboard({ onLogout }) {
         <div className="teacher-panel-heading">
           <div>
             <h2>📊 Attendance Reports</h2>
-            <p>Only scheduled class days are included in attendance totals and percentages.</p>
+            <p>Each student is counted once per date. All saved attendance records remain in the monthly report, even if the timetable is edited later.</p>
           </div>
         </div>
 
@@ -785,7 +782,7 @@ function TeacherDashboard({ onLogout }) {
             <div className="attendance-summary teacher-attendance-summary">
               <span>🟢 Present: {totalPresent}</span>
               <span>🔴 Absent: {totalAbsent}</span>
-              <span>📚 Recorded: {totalRecorded}</span>
+              <span>📚 Attendance Records: {totalRecorded}</span>
               <span>📈 Overall: {overallPercentage === null ? "No records" : `${overallPercentage}%`}</span>
             </div>
 
@@ -796,7 +793,7 @@ function TeacherDashboard({ onLogout }) {
                     <th>Student</th>
                     <th>Present</th>
                     <th>Absent</th>
-                    <th>Recorded Classes</th>
+                    <th>Recorded Days</th>
                     <th>Attendance %</th>
                   </tr>
                 </thead>
