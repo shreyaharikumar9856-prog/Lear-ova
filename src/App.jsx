@@ -665,11 +665,18 @@ function App() {
         {activeTab === "Dashboard" ? (
           <>
 
-            <StudentLeaderboard
-              compact
-              onViewAll={() => setActiveTab("Leaderboard")}
-            />
+            <div className="dashboard-leaderboard-layout">
+  <div className="dashboard-leaderboard-content">
+    <StudentLeaderboard
+      compact
+      onViewAll={() => setActiveTab("Leaderboard")}
+    />
+  </div>
 
+  <div className="dashboard-teddy-bear" aria-label="Learnova teddy bear">
+    🐻
+  </div>
+</div>
 <section className="panel tasks-panel dashboard-timetable-panel">
                 <div className="panel-heading">
                   <div>
