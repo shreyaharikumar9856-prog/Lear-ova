@@ -437,3 +437,133 @@
     flex-direction: column;
   }
 }
+
+
+/* Compact leaderboard preview used on the student home dashboard. */
+.sl-compact {
+  margin: 0 0 20px;
+  padding: 21px 23px;
+  border: 1px solid #f0e7ed;
+  border-radius: 21px;
+  background: #fff;
+  box-shadow: 0 3px 14px rgba(73, 58, 99, 0.035);
+}
+
+.sl-compact .sl-header {
+  margin-bottom: 12px;
+}
+
+.sl-compact .sl-header h2 {
+  font-size: clamp(20px, 2.5vw, 25px);
+}
+
+.sl-compact .sl-month-strip {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+}
+
+.sl-compact .sl-your-position {
+  margin-bottom: 12px;
+  padding: 11px 14px;
+}
+
+.sl-compact .sl-podium {
+  margin: 12px 0 14px;
+  gap: 10px;
+}
+
+.sl-compact .sl-podium-card {
+  padding: 13px 8px 12px;
+  gap: 6px;
+  border-radius: 13px;
+}
+
+.sl-compact .sl-podium-1 {
+  padding-top: 16px;
+}
+
+.sl-compact .sl-podium-medal {
+  font-size: 22px;
+}
+
+.sl-compact .sl-avatar {
+  width: 43px;
+  height: 43px;
+  font-size: 14px;
+}
+
+.sl-compact .sl-podium-name {
+  font-size: 12px;
+}
+
+.sl-compact .sl-podium-rank {
+  font-size: 10px;
+}
+
+.sl-compact .sl-podium-coins {
+  font-size: 14px;
+}
+
+.sl-compact-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #f1edf5;
+  color: #89849a;
+  font-size: 12px;
+}
+
+.sl-view-all {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: #f4efff;
+  color: #66579b;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sl-view-all:hover {
+  background: #ebe4ff;
+}
+
+.sl-view-all:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (max-width: 620px) {
+  .sl-compact {
+    padding: 16px 13px;
+  }
+
+  .sl-compact .sl-header {
+    align-items: flex-start;
+  }
+
+  .sl-compact .sl-header p {
+    max-width: 210px;
+    line-height: 1.5;
+  }
+
+  .sl-compact .sl-podium {
+    gap: 7px;
+  }
+
+  .sl-compact .sl-podium-card {
+    padding: 11px 5px;
+  }
+
+  .sl-compact .sl-podium-name {
+    font-size: 10px;
+  }
+
+  .sl-compact .sl-league-badge {
+    padding: 4px 6px;
+    font-size: 9px;
+  }
+}
