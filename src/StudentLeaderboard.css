@@ -1,0 +1,439 @@
+ .student-leaderboard {
+  width: 100%;
+  color: #343047;
+}
+
+.sl-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.sl-eyebrow {
+  color: #8b7bc7;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+}
+
+.sl-header h2 {
+  margin: 5px 0 6px;
+  font-size: clamp(22px, 3vw, 30px);
+  color: #38314f;
+}
+
+.sl-header p,
+.sl-list-heading p {
+  margin: 0;
+  color: #817d91;
+  font-size: 13px;
+}
+
+.sl-refresh,
+.sl-retry {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: #7163b7;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sl-refresh:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.sl-month-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 17px;
+  border: 1px solid #eeeaf8;
+  background: #faf8ff;
+  border-radius: 13px;
+  color: #6f668d;
+  margin-bottom: 18px;
+}
+
+.sl-month-strip strong {
+  color: #514776;
+}
+
+.sl-your-position {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  background: linear-gradient(110deg, #f4efff, #fff6f2);
+  border: 1px solid #e9e0fb;
+  border-radius: 15px;
+  padding: 15px 18px;
+  margin-bottom: 22px;
+}
+
+.sl-your-position-icon {
+  font-size: 28px;
+}
+
+.sl-your-position > div:nth-child(2) {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sl-your-position > div:nth-child(2) span,
+.sl-your-points span {
+  color: #817d91;
+  font-size: 12px;
+}
+
+.sl-your-position > div:nth-child(2) strong {
+  color: #514776;
+  font-size: 18px;
+}
+
+.sl-your-points {
+  margin-left: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.sl-your-points strong {
+  color: #514776;
+  font-size: 23px;
+}
+
+.sl-podium {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 13px;
+  margin: 22px 0;
+}
+
+.sl-podium-card {
+  position: relative;
+  min-width: 0;
+  padding: 20px 10px 17px;
+  border: 1px solid #eeeaf5;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 5px 18px rgba(54, 43, 88, 0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.sl-podium-1 {
+  padding-top: 27px;
+  border-color: #f0d58a;
+  background: linear-gradient(180deg, #fffaf0, #fff);
+}
+
+.sl-podium-2 {
+  border-color: #dce0e9;
+  background: linear-gradient(180deg, #f8f9fc, #fff);
+}
+
+.sl-podium-3 {
+  border-color: #ead2c1;
+  background: linear-gradient(180deg, #fff8f3, #fff);
+}
+
+.sl-podium-card.is-you {
+  outline: 2px solid #9181d0;
+  outline-offset: 2px;
+}
+
+.sl-podium-medal {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.sl-avatar,
+.sl-small-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: #65579a;
+  background: #eee9fb;
+  font-weight: 800;
+}
+
+.sl-avatar {
+  width: 54px;
+  height: 54px;
+  font-size: 16px;
+}
+
+.sl-podium-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  overflow-wrap: anywhere;
+  color: #443d5d;
+  font-size: 14px;
+}
+
+.sl-podium-rank {
+  color: #89849a;
+  font-size: 12px;
+}
+
+.sl-podium-coins {
+  color: #5a4b8f;
+  font-size: 17px;
+}
+
+.sl-league-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 30px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sl-league-badge.bronze {
+  color: #99613f;
+  background: #f8ece3;
+}
+
+.sl-league-badge.silver {
+  color: #667080;
+  background: #eef0f4;
+}
+
+.sl-league-badge.gold {
+  color: #947018;
+  background: #fff4d7;
+}
+
+.sl-league-badge.diamond {
+  color: #2873a5;
+  background: #e4f4ff;
+}
+
+.sl-you-tag {
+  display: inline-block;
+  margin-left: 5px;
+  border-radius: 20px;
+  padding: 2px 6px;
+  background: #eee9fb;
+  color: #6959a8;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+  vertical-align: middle;
+}
+
+.sl-list-card {
+  border: 1px solid #eeeaf5;
+  background: #fff;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(54, 43, 88, 0.04);
+}
+
+.sl-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 17px 18px;
+  border-bottom: 1px solid #f0edf6;
+}
+
+.sl-list-heading h3 {
+  margin: 0 0 4px;
+  color: #443d5d;
+  font-size: 17px;
+}
+
+.sl-sort-note {
+  color: #918ba2;
+  font-size: 11px;
+}
+
+.sl-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.sl-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 480px;
+}
+
+.sl-table th,
+.sl-table td {
+  padding: 13px 16px;
+  border-bottom: 1px solid #f2eff7;
+  text-align: left;
+  font-size: 13px;
+}
+
+.sl-table th {
+  color: #918ba2;
+  background: #fcfbfe;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sl-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.sl-current-row td {
+  background: #f8f5ff;
+}
+
+.sl-rank-number {
+  color: #6d6680;
+  font-weight: 800;
+}
+
+.sl-rank-number.top-rank {
+  font-size: 18px;
+}
+
+.sl-student-cell {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 150px;
+}
+
+.sl-student-cell strong {
+  color: #48415f;
+  font-size: 13px;
+}
+
+.sl-small-avatar {
+  width: 34px;
+  height: 34px;
+  font-size: 10px;
+}
+
+.sl-coins-heading,
+.sl-coins-cell {
+  text-align: right !important;
+}
+
+.sl-coins-cell {
+  color: #5c4c91;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sl-state {
+  padding: 28px 16px;
+  text-align: center;
+  color: #89849a;
+  font-size: 14px;
+}
+
+.sl-error {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid #f1cece;
+  border-radius: 12px;
+  background: #fff7f7;
+  color: #9d4141;
+}
+
+.sl-error p {
+  margin: 7px 0;
+  overflow-wrap: anywhere;
+}
+
+.sl-error-help {
+  color: #806969;
+  font-size: 12px;
+}
+
+.sl-retry {
+  margin-top: 7px;
+  background: #a85c5c;
+}
+
+.sl-footer-note {
+  margin: 17px 0 0;
+  text-align: center;
+  color: #89849a;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .sl-header {
+    flex-direction: column;
+  }
+
+  .sl-month-strip {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .sl-podium {
+    gap: 7px;
+  }
+
+  .sl-podium-card {
+    padding: 14px 6px;
+    gap: 6px;
+  }
+
+  .sl-podium-1 {
+    padding-top: 18px;
+  }
+
+  .sl-podium-medal {
+    font-size: 23px;
+  }
+
+  .sl-avatar {
+    width: 43px;
+    height: 43px;
+    font-size: 13px;
+  }
+
+  .sl-podium-name {
+    font-size: 11px;
+  }
+
+  .sl-podium-coins {
+    font-size: 14px;
+  }
+
+  .sl-league-badge {
+    font-size: 9px;
+    padding: 4px 7px;
+  }
+
+  .sl-your-position {
+    padding: 13px;
+  }
+
+  .sl-list-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
