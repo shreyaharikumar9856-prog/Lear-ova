@@ -32,6 +32,21 @@ function getInitials(name) {
     .toUpperCase();
 }
 
+function StudentAvatar({ student, className = "sl-avatar" }) {
+  if (student.avatar_image) {
+    return (
+      <img
+        className={`${className} sl-avatar-image`}
+        src={student.avatar_image}
+        alt={`${student.full_name || "Student"}'s avatar`}
+        loading="lazy"
+      />
+    );
+  }
+
+  return <span className={className}>{getInitials(student.full_name)}</span>;
+}
+
 function rankRows(rows) {
   let previousCoins = null;
   let previousRank = 0;
@@ -198,7 +213,7 @@ export default function StudentLeaderboard({ compact = false, onViewAll }) {
               <div className="sl-podium-medal">
                 {student.rank === 1 ? "👑" : student.rank === 2 ? "🥈" : "🥉"}
               </div>
-              <div className="sl-avatar">{getInitials(student.full_name)}</div>
+              <StudentAvatar student={student} />
               <strong className="sl-podium-name">
                 {student.full_name}
                 {String(student.student_id) === String(currentStudentId) && (
@@ -276,9 +291,10 @@ export default function StudentLeaderboard({ compact = false, onViewAll }) {
                             </td>
                             <td>
                               <div className="sl-student-cell">
-                                <span className="sl-small-avatar">
-                                  {getInitials(student.full_name)}
-                                </span>
+                                <StudentAvatar
+                                  student={student}
+                                  className="sl-small-avatar"
+                                />
                                 <strong>
                                   {student.full_name}
                                   {isYou && <span className="sl-you-tag">YOU</span>}
