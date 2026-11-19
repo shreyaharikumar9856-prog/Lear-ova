@@ -524,3 +524,37 @@
     flex: 1;
   }
 }
+/* Teacher feedback section */
+
+.tts-feedback-section {
+  margin-top: 15px;
+  padding: 16px;
+  border: 1px solid #e9ddef;
+  border-radius: 12px;
+  background: #fcf9ff;
+}
+
+.tts-feedback-section label {
+  color: #725278;
+  font-weight: 900;
+}
+
+.tts-feedback-section small {
+  display: block;
+  margin-top: 8px;
+  color: #998ba0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.tts-feedback-section textarea {
+  width: 100%;
+  min-height: 100px;
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid #e4d8eb;
+  border-radius: 9px;
+  background: #fff;
+  font: 13px "Nunito", sans-serif;
+  resize: vertical;
+}
