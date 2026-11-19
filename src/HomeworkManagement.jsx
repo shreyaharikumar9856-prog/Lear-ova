@@ -4,24 +4,28 @@ import "./HomeworkManagement.css";
 
 const BUCKET_NAME = "homework-files";
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
-const DRAFT_KEY = "learnova_homework_draft";
-
-function readHomeworkDraft() {
-  try {
-    const saved = localStorage.getItem(DRAFT_KEY);
-    return saved ? JSON.parse(saved) : {};
-  } catch (error) {
-    console.error("Unable to read homework draft:", error);
-    return {};
-  }
-}
 
 function HomeworkManagement() {
   const [students, setStudents] = useState([]);
   const [assignments, setAssignments] = useState([]);
 
+  // Restore an unfinished homework draft when this page opens.
+  const DRAFT_KEY = "learnova_homework_draft";
+
+  function readHomeworkDraft() {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+      console.error("Unable to read homework draft:", error);
+      return {};
+    }
+  }
+
   const [initialDraft] = useState(readHomeworkDraft);
   const isClearingDraft = useRef(false);
+  const draftBeforeEditing = useRef(null);
+  const skipDraftSave = useRef(false);
 
   const [title, setTitle] = useState(initialDraft.title || "");
   const [subject, setSubject] = useState(initialDraft.subject || "Mathematics");
@@ -32,21 +36,27 @@ function HomeworkManagement() {
   const [selectedFile, setSelectedFile] = useState(null);
 
   const [teacherFilter, setTeacherFilter] = useState("all");
-
+  const [editingAssignmentId, setEditingAssignmentId] = useState(null);
+  const [deletingAssignmentId, setDeletingAssignmentId] = useState(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // AUTOMATIC HOMEWORK DRAFT SAVING
-
+  // Save text fields automatically so they survive an accidental page reload.
   useEffect(() => {
+    if (editingAssignmentId) return;
+
+    if (skipDraftSave.current) {
+      skipDraftSave.current = false;
+      return;
+    }
+
     if (isClearingDraft.current) {
       try {
         localStorage.removeItem(DRAFT_KEY);
       } catch (error) {
-        console.error("Unable to clear draft:", error);
+        console.error("Unable to clear homework draft:", error);
       }
-
       isClearingDraft.current = false;
       return;
     }
@@ -63,16 +73,9 @@ function HomeworkManagement() {
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     } catch (error) {
-      console.error("Unable to save draft:", error);
+      console.error("Unable to save homework draft:", error);
     }
-  }, [
-    title,
-    subject,
-    description,
-    dueDate,
-    studentId,
-    teacherName,
-  ]);
+  }, [title, subject, description, dueDate, studentId, teacherName, editingAssignmentId]);
 
   // LOAD STUDENTS AND HOMEWORK
 
@@ -149,14 +152,64 @@ function HomeworkManagement() {
     return filePath;
   }
 
-  // CREATE AND ASSIGN HOMEWORK
+  // RESTORE THE FORM VALUES THAT WERE PRESENT BEFORE EDITING.
+
+  function restoreFormAfterEditing() {
+    const previous = draftBeforeEditing.current || {};
+    skipDraftSave.current = true;
+
+    setTitle(previous.title || "");
+    setSubject(previous.subject || "Mathematics");
+    setDescription(previous.description || "");
+    setDueDate(previous.dueDate || "");
+    setStudentId(previous.studentId || "all");
+    setTeacherName(previous.teacherName || "");
+    setSelectedFile(null);
+    setEditingAssignmentId(null);
+    draftBeforeEditing.current = null;
+
+    const fileInput = document.getElementById("homework-attachment");
+    if (fileInput) fileInput.value = "";
+  }
+
+  // START EDITING ONE STUDENT'S HOMEWORK RECORD.
+
+  function startEditing(assignment) {
+    draftBeforeEditing.current = {
+      title,
+      subject,
+      description,
+      dueDate,
+      studentId,
+      teacherName,
+    };
+
+    setEditingAssignmentId(assignment.id);
+    setTitle(assignment.title || "");
+    setSubject(assignment.subject || "Mathematics");
+    setDescription(assignment.description || "");
+    setDueDate(assignment.due_date || "");
+    setStudentId(String(assignment.student_id));
+    setTeacherName(assignment.teacher_name || "");
+    setSelectedFile(null);
+    setMessage("Editing this student's homework. Other students' copies will not be changed.");
+
+    const fileInput = document.getElementById("homework-attachment");
+    if (fileInput) fileInput.value = "";
+
+    document.getElementById("homework-form")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
+  // CREATE NEW HOMEWORK OR SAVE CHANGES TO AN EXISTING RECORD.
 
   async function createHomework(event) {
     event.preventDefault();
 
     setSaving(true);
     setMessage("");
-
     let uploadedPath = null;
 
     try {
@@ -180,28 +233,93 @@ function HomeworkManagement() {
         return;
       }
 
+      // EDIT MODE: update only the selected student's assignment row.
+      if (editingAssignmentId) {
+        const existingAssignment = assignments.find(
+          (item) => String(item.id) === String(editingAssignmentId)
+        );
+
+        if (!existingAssignment) {
+          setMessage("This homework could not be found. Please refresh and try again.");
+          return;
+        }
+
+        if (selectedFile) {
+          uploadedPath = await uploadAttachment(selectedFile);
+        }
+
+        const updatedValues = {
+          title: title.trim(),
+          subject,
+          description: description.trim(),
+          due_date: dueDate || null,
+          teacher_name: teacherName.trim(),
+          attachment_path: uploadedPath || existingAssignment.attachment_path || null,
+        };
+
+        const { data: updatedRows, error: updateError } = await supabase
+          .from("assignments")
+          .update(updatedValues)
+          .eq("id", editingAssignmentId)
+          .select("id");
+
+        if (updateError) {
+          if (uploadedPath) {
+            await supabase.storage.from(BUCKET_NAME).remove([uploadedPath]);
+          }
+          throw updateError;
+        }
+
+        if (!updatedRows || updatedRows.length === 0) {
+          if (uploadedPath) {
+            await supabase.storage.from(BUCKET_NAME).remove([uploadedPath]);
+          }
+          throw new Error("Homework was not updated. Please check your teacher permissions and try again.");
+        }
+
+        // Remove the previous attachment only when no assignment still uses it.
+        if (
+          uploadedPath &&
+          existingAssignment.attachment_path &&
+          existingAssignment.attachment_path !== uploadedPath
+        ) {
+          const { count, error: countError } = await supabase
+            .from("assignments")
+            .select("id", { count: "exact", head: true })
+            .eq("attachment_path", existingAssignment.attachment_path);
+
+          if (!countError && count === 0) {
+            const { error: removeError } = await supabase.storage
+              .from(BUCKET_NAME)
+              .remove([existingAssignment.attachment_path]);
+            if (removeError) {
+              console.warn("Updated homework, but the old attachment could not be removed:", removeError.message);
+            }
+          }
+        }
+
+        restoreFormAfterEditing();
+        await loadData();
+        setMessage("Homework updated successfully! ✅");
+        return;
+      }
+
+      // CREATE MODE
       const selectedStudents =
         studentId === "all"
           ? students
           : students.filter(
-              (student) =>
-                String(student.id) === String(studentId)
+              (student) => String(student.id) === String(studentId)
             );
 
       if (selectedStudents.length === 0) {
-        setMessage(
-          "Please register a student before assigning homework."
-        );
+        setMessage("Please register a student before assigning homework.");
         return;
       }
-
-      // UPLOAD ATTACHMENT
 
       if (selectedFile) {
         uploadedPath = await uploadAttachment(selectedFile);
       }
-
-      // PREPARE HOMEWORK RECORDS
 
       const rows = selectedStudents.map((student) => ({
         student_id: student.id,
@@ -214,36 +332,23 @@ function HomeworkManagement() {
         teacher_name: teacherName.trim(),
       }));
 
-      const { error } = await supabase
-        .from("assignments")
-        .insert(rows);
+      const { error } = await supabase.from("assignments").insert(rows);
 
       if (error) {
         if (uploadedPath) {
-          const { error: removeError } =
-            await supabase.storage
-              .from(BUCKET_NAME)
-              .remove([uploadedPath]);
-
+          const { error: removeError } = await supabase.storage
+            .from(BUCKET_NAME)
+            .remove([uploadedPath]);
           if (removeError) {
-            console.error(
-              "Unable to remove unused attachment:",
-              removeError.message
-            );
+            console.error("Unable to remove unused attachment:", removeError.message);
           }
         }
 
-        setMessage(
-          `Unable to create homework: ${error.message}`
-        );
-
+        setMessage(`Unable to create homework: ${error.message}`);
         return;
       }
 
-      // CLEAR FORM AFTER SUCCESSFUL ASSIGNMENT
-
       isClearingDraft.current = true;
-
       setTitle("");
       setSubject("Mathematics");
       setDescription("");
@@ -252,24 +357,103 @@ function HomeworkManagement() {
       setTeacherName("");
       setSelectedFile(null);
 
-      const fileInput = document.getElementById(
-        "homework-attachment"
-      );
+      const fileInput = document.getElementById("homework-attachment");
+      if (fileInput) fileInput.value = "";
 
-      if (fileInput) {
-        fileInput.value = "";
+      await loadData();
+      setMessage("Homework assigned successfully! 🎉");
+    } catch (error) {
+      setMessage(error.message || "Unable to save homework.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // DELETE ONE HOMEWORK RECORD AND ITS ASSOCIATED STUDENT SUBMISSIONS.
+
+  async function deleteHomework(assignment, studentName) {
+    const confirmed = window.confirm(
+      `Delete "${assignment.title}" for ${studentName}?\n\nAny submissions attached to this homework will also be deleted. This cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingAssignmentId(assignment.id);
+    setMessage("");
+
+    try {
+      // Collect student-submission files before deleting their database records.
+      const { data: submissionRows, error: submissionFetchError } = await supabase
+        .from("assignment_submissions")
+        .select("file_url")
+        .eq("assignment_id", assignment.id);
+
+      if (submissionFetchError) throw submissionFetchError;
+
+      // Remove linked submissions first so the assignment can be deleted cleanly.
+      const { data: deletedSubmissionRows, error: submissionDeleteError } = await supabase
+        .from("assignment_submissions")
+        .delete()
+        .eq("assignment_id", assignment.id)
+        .select("id");
+
+      if (submissionDeleteError) throw submissionDeleteError;
+      if ((submissionRows || []).length > 0 && (deletedSubmissionRows || []).length !== submissionRows.length) {
+        throw new Error("Some student submissions could not be deleted. Check the database permissions and try again.");
+      }
+
+      const { data: deletedAssignmentRows, error: assignmentDeleteError } = await supabase
+        .from("assignments")
+        .delete()
+        .eq("id", assignment.id)
+        .select("id");
+
+      if (assignmentDeleteError) throw assignmentDeleteError;
+      if (!deletedAssignmentRows || deletedAssignmentRows.length === 0) {
+        throw new Error("No homework record was deleted. Please check your teacher permissions and try again.");
+      }
+
+      // Remove uploaded student response files after their records are deleted.
+      const submissionPaths = [
+        ...new Set((submissionRows || []).map((row) => row.file_url).filter(Boolean)),
+      ];
+
+      if (submissionPaths.length > 0) {
+        const { error: removeSubmissionFilesError } = await supabase.storage
+          .from(BUCKET_NAME)
+          .remove(submissionPaths);
+        if (removeSubmissionFilesError) {
+          console.warn("Homework was deleted, but some submission files remain:", removeSubmissionFilesError.message);
+        }
+      }
+
+      // Shared teacher attachments are kept while another assignment uses them.
+      if (assignment.attachment_path) {
+        const { count, error: countError } = await supabase
+          .from("assignments")
+          .select("id", { count: "exact", head: true })
+          .eq("attachment_path", assignment.attachment_path);
+
+        if (!countError && count === 0) {
+          const { error: removeAttachmentError } = await supabase.storage
+            .from(BUCKET_NAME)
+            .remove([assignment.attachment_path]);
+          if (removeAttachmentError) {
+            console.warn("Homework was deleted, but its attachment could not be removed:", removeAttachmentError.message);
+          }
+        }
+      }
+
+      if (String(editingAssignmentId) === String(assignment.id)) {
+        restoreFormAfterEditing();
       }
 
       await loadData();
-
-      setMessage("Homework assigned successfully! 🎉");
-
+      setMessage(`Homework deleted for ${studentName}.`);
     } catch (error) {
-      setMessage(
-        error.message || "Unable to create homework."
-      );
+      setMessage(`Unable to delete homework: ${error.message}`);
     } finally {
-      setSaving(false);
+      setDeletingAssignmentId(null);
     }
   }
 
@@ -357,12 +541,14 @@ function HomeworkManagement() {
     );
 
   // MAIN PAGE
+
   return (
     <section className="homework-management">
 
       {/* HEADER */}
 
       <div className="homework-page-header">
+
         <div>
           <span className="homework-tag">
             LEARNOVA • TEACHER SPACE
@@ -379,26 +565,34 @@ function HomeworkManagement() {
         <div className="homework-header-icon">
           📝
         </div>
+
       </div>
+
 
       {/* CREATE HOMEWORK */}
 
       <div className="homework-panel">
 
         <div className="homework-panel-heading">
+
           <div className="homework-section-icon">
             ✏️
           </div>
 
           <div>
-            <h3>Create New Homework</h3>
+            <h3>{editingAssignmentId ? "Edit Homework" : "Create New Homework"}</h3>
             <p>
-              Fill in the details below to assign homework.
+              {editingAssignmentId
+                ? "Update the details for this student's homework."
+                : "Fill in the details below to assign homework."}
             </p>
           </div>
+
         </div>
 
+
         <form
+          id="homework-form"
           onSubmit={createHomework}
           className="homework-form"
         >
@@ -406,6 +600,7 @@ function HomeworkManagement() {
           {/* TEACHER NAME */}
 
           <div className="homework-field homework-full-width">
+
             <label htmlFor="homework-teacher">
               Teacher Name *
             </label>
@@ -420,11 +615,14 @@ function HomeworkManagement() {
               placeholder="Enter teacher name"
               required
             />
+
           </div>
+
 
           {/* HOMEWORK TITLE */}
 
           <div className="homework-field homework-full-width">
+
             <label htmlFor="homework-title">
               Homework Title *
             </label>
@@ -439,13 +637,16 @@ function HomeworkManagement() {
               placeholder="e.g. Chapter 4 exercises"
               required
             />
+
           </div>
+
 
           {/* SUBJECT AND STUDENT */}
 
           <div className="homework-form-row">
 
             <div className="homework-field">
+
               <label htmlFor="homework-subject">
                 Subject *
               </label>
@@ -468,9 +669,12 @@ function HomeworkManagement() {
                 <option>Social Science</option>
                 <option>Other</option>
               </select>
+
             </div>
 
+
             <div className="homework-field">
+
               <label htmlFor="homework-student">
                 Assign To *
               </label>
@@ -478,13 +682,13 @@ function HomeworkManagement() {
               <select
                 id="homework-student"
                 value={studentId}
-                onChange={(event) =>
-                  setStudentId(event.target.value)
-                }
+                onChange={(event) => setStudentId(event.target.value)}
+                disabled={Boolean(editingAssignmentId)}
               >
-                <option value="all">
-                  All Students
-                </option>
+
+                {!editingAssignmentId && (
+                  <option value="all">All Students</option>
+                )}
 
                 {students.map((student) => (
                   <option
@@ -494,14 +698,18 @@ function HomeworkManagement() {
                     {student.full_name}
                   </option>
                 ))}
+
               </select>
+
             </div>
 
           </div>
 
+
           {/* INSTRUCTIONS */}
 
           <div className="homework-field homework-full-width">
+
             <label htmlFor="homework-description">
               Instructions *
             </label>
@@ -521,11 +729,14 @@ function HomeworkManagement() {
               Provide clear instructions so students understand
               what they need to do.
             </small>
+
           </div>
+
 
           {/* DUE DATE */}
 
           <div className="homework-field homework-full-width">
+
             <label htmlFor="homework-date">
               📅 Due Date
             </label>
@@ -538,7 +749,9 @@ function HomeworkManagement() {
                 setDueDate(event.target.value)
               }
             />
+
           </div>
+
 
           {/* FILE UPLOAD */}
 
@@ -583,6 +796,7 @@ function HomeworkManagement() {
                 />
 
                 {selectedFile && (
+
                   <div className="homework-selected-file">
 
                     ✅ {selectedFile.name}
@@ -614,23 +828,33 @@ function HomeworkManagement() {
                     </button>
 
                   </div>
+
                 )}
 
               </div>
+
             </div>
 
             <small>
               Maximum file size: 50 MB.
+              {editingAssignmentId
+                ? " Leave the file field empty to keep the current attachment, or choose a new file to replace it."
+                : ""}
             </small>
 
           </div>
 
+
           {/* MESSAGE */}
 
           {message && (
+
             <div
               className={`homework-message ${
-                message.toLowerCase().includes("success")
+                message.toLowerCase().includes("success") ||
+                message.toLowerCase().includes("updated") ||
+                message.toLowerCase().includes("deleted") ||
+                message.toLowerCase().includes("editing")
                   ? "homework-success"
                   : "homework-error"
               }`}
@@ -639,25 +863,55 @@ function HomeworkManagement() {
             >
               {message}
             </div>
+
           )}
+
 
           {/* ASSIGN BUTTON */}
 
           <div className="homework-submit-area">
+
             <button
               type="submit"
               className="homework-submit-button"
               disabled={saving || loading}
             >
               {saving
-                ? "⏳ Uploading and assigning..."
-                : "✨ Assign Homework"}
+                ? "⏳ Saving..."
+                : editingAssignmentId
+                  ? "💾 Save Changes"
+                  : "✨ Assign Homework"}
             </button>
+
+            {editingAssignmentId && (
+              <button
+                type="button"
+                className="homework-cancel-edit-button"
+                disabled={saving}
+                onClick={restoreFormAfterEditing}
+                style={{
+                  marginLeft: "10px",
+                  padding: "12px 18px",
+                  border: "1px solid #D9C6E7",
+                  borderRadius: "12px",
+                  background: "#FFFFFF",
+                  color: "#67477D",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel Edit
+              </button>
+            )}
+
           </div>
 
         </form>
+
       </div>
-            {/* ASSIGNED HOMEWORK */}
+
+
+      {/* ASSIGNED HOMEWORK */}
 
       <div className="homework-assigned-section">
 
@@ -680,6 +934,7 @@ function HomeworkManagement() {
           </span>
 
         </div>
+
 
         {/* TEACHER FILTER */}
 
@@ -708,18 +963,22 @@ function HomeworkManagement() {
               </option>
 
               {teacherNames.map((teacher) => (
+
                 <option
                   key={teacher}
                   value={teacher}
                 >
                   {teacher}
                 </option>
+
               ))}
 
             </select>
 
           </div>
+
         </div>
+
 
         {/* LOADING */}
 
@@ -741,7 +1000,6 @@ function HomeworkManagement() {
           <div className="homework-no-assignments">
             <div>🌼</div>
             <h3>No assignments found</h3>
-
             <p>
               No homework is available for this teacher.
             </p>
@@ -793,6 +1051,7 @@ function HomeworkManagement() {
 
                 </summary>
 
+
                 {/* STUDENT HOMEWORK */}
 
                 <div className="homework-student-content">
@@ -836,6 +1095,7 @@ function HomeworkManagement() {
 
                           </div>
 
+
                           {/* HOMEWORK INFORMATION */}
 
                           <div className="homework-card-info">
@@ -871,6 +1131,7 @@ function HomeworkManagement() {
 
                           </div>
 
+
                           {/* INSTRUCTIONS */}
 
                           <div className="homework-card-description">
@@ -885,6 +1146,7 @@ function HomeworkManagement() {
                             </p>
 
                           </div>
+
 
                           {/* ATTACHMENT */}
 
@@ -903,6 +1165,57 @@ function HomeworkManagement() {
                             </button>
 
                           )}
+
+                          <div
+                            className="homework-card-actions"
+                            style={{
+                              display: "flex",
+                              justifyContent: "flex-end",
+                              flexWrap: "wrap",
+                              gap: "10px",
+                              marginTop: "18px",
+                              padding: 0,
+                              background: "transparent",
+                              border: "none",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => startEditing(assignment)}
+                              disabled={saving || deletingAssignmentId === assignment.id}
+                              style={{
+                                margin: 0,
+                                padding: "9px 15px",
+                                border: "none",
+                                borderRadius: "10px",
+                                background: "#AD73C9",
+                                color: "#FFFFFF",
+                                fontWeight: 800,
+                                cursor: "pointer",
+                              }}
+                            >
+                              ✏️ Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => deleteHomework(assignment, student.full_name)}
+                              disabled={deletingAssignmentId === assignment.id || saving}
+                              style={{
+                                margin: 0,
+                                padding: "9px 15px",
+                                border: "none",
+                                borderRadius: "10px",
+                                background: "#D96C7A",
+                                color: "#FFFFFF",
+                                fontWeight: 800,
+                                cursor: "pointer",
+                                opacity: deletingAssignmentId === assignment.id ? 0.65 : 1,
+                              }}
+                            >
+                              {deletingAssignmentId === assignment.id ? "Deleting..." : "🗑️ Delete"}
+                            </button>
+                          </div>
 
                         </article>
 
