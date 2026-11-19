@@ -48,14 +48,10 @@ function App() {
   const [role, setRole] = useState(null);
   const [checkingRole, setCheckingRole] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [activeTab, setActiveTab] = useState(() => {
-  try {
-    return localStorage.getItem("learnova_student_active_tab") || "Dashboard";
-  } catch {
-    return "Dashboard";
-  }
-});
+  // Always open students on the home dashboard after a fresh page load.
+  const [activeTab, setActiveTab] = useState("Dashboard");
   const [selectedAvatar, setSelectedAvatar] = useState(null);
+  const [studentName, setStudentName] = useState("");
   const [dashboardData, setDashboardData] = useState({
     loading: true,
     coins: 0,
@@ -162,15 +158,6 @@ function App() {
     };
   }, [user]);
 
-  // Remember the student's current page
-useEffect(() => {
-  try {
-    localStorage.setItem("learnova_student_active_tab", activeTab);
-  } catch (error) {
-    console.error("Unable to save active tab:", error);
-  }
-}, [activeTab]);
-  
   // Fetch selected avatar and listen for avatar changes
   useEffect(() => {
     let cancelled = false;
@@ -279,6 +266,7 @@ useEffect(() => {
 
     async function setupStudentDashboard() {
       if (!user || role !== "student") {
+        setStudentName("");
         setDashboardData({
           loading: true,
           coins: 0,
@@ -295,13 +283,14 @@ useEffect(() => {
 
       const { data: student, error: studentError } = await supabase
         .from("students")
-        .select("id")
+        .select("id, full_name")
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (cancelled) return;
 
       if (studentError || !student) {
+        setStudentName("");
         console.error(
           "Unable to load student dashboard profile:",
           studentError?.message || "Student profile not found."
@@ -321,6 +310,8 @@ useEffect(() => {
         });
         return;
       }
+
+      setStudentName(student.full_name || "");
 
       async function loadDashboardData() {
         const now = new Date();
@@ -641,7 +632,8 @@ useEffect(() => {
 
             <h1>
               {activeTab === "Dashboard"
-                ? `Hello, ${
+                ? `Welcome back, ${
+                    studentName ||
                     user.user_metadata?.full_name ||
                     user.email?.split("@")[0] ||
                     "sunshine"
@@ -672,7 +664,73 @@ useEffect(() => {
         {/* Student Dashboard */}
         {activeTab === "Dashboard" ? (
           <>
-            <section className="hero-card">
+
+            <StudentLeaderboard
+              compact
+              onViewAll={() => setActiveTab("Leaderboard")}
+            />
+
+<section className="panel tasks-panel dashboard-timetable-panel">
+                <div className="panel-heading">
+                  <div>
+                    <h2>Today's plan 🌼</h2>
+                    <p>One thing at a time.</p>
+                  </div>
+
+                  <span className="plan-date">TODAY</span>
+                </div>
+
+                {dashboardData.loading ? (
+                  <p>Loading today's timetable...</p>
+                ) : dashboardData.errors.timetable ? (
+                  <p>Unable to load today's timetable.</p>
+                ) : dashboardData.todayClasses.length === 0 ? (
+                  <p className="no-classes-message">
+                    No classes are scheduled for today. Enjoy your day! 🌷
+                  </p>
+                ) : (
+                  dashboardData.todayClasses.map((item) => (
+                    <div className="task-item" key={item.id}>
+                      <div className="task-time">
+                        {formatScheduleTime(item.start_time)}
+                        {item.end_time
+                          ? ` – ${formatScheduleTime(item.end_time)}`
+                          : ""}
+                      </div>
+
+                      <div className="task-details">
+                        <h3>{item.subject || "Class"}</h3>
+                        <p>
+                          {item.teacher_name
+                            ? `Teacher: ${item.teacher_name}`
+                            : item.notes || "Scheduled class"}
+                        </p>
+                        {item.meeting_link && (
+                          <a
+                            className="task-meeting-link"
+                            href={item.meeting_link}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Join class →
+                          </a>
+                        )}
+                      </div>
+
+                      <span className="task-emoji">📚</span>
+                    </div>
+                  ))
+                )}
+
+                <button
+                  className="secondary-button"
+                  onClick={() => setActiveTab("Timetable")}
+                >
+                  See my timetable →
+                </button>
+              </section>
+
+<section className="hero-card">
               <div className="hero-text">
                 <span className="tiny-tag">
                   ✦ YOUR LEARNING JOURNEY ✦
@@ -725,8 +783,7 @@ useEffect(() => {
               <div className="hero-decoration decoration-two"></div>
             </section>
 
-            
-            <section className="stats-grid">
+<section className="stats-grid">
               <div className="stat-card pink">
                 <div className="stat-icon">🪙</div>
                 <p>My coins this month</p>
@@ -788,8 +845,7 @@ useEffect(() => {
               </div>
             </section>
 
-            <section className="content-grid">
-              <div className="panel subjects-panel">
+<section className="panel subjects-panel dashboard-subjects-panel">
                 <div className="panel-heading">
                   <div>
                     <h2>My subjects 📚</h2>
@@ -828,70 +884,9 @@ useEffect(() => {
                     ))
                   )}
                 </div>
-              </div>
+              </section>
 
-              <div className="panel tasks-panel">
-                <div className="panel-heading">
-                  <div>
-                    <h2>Today's plan 🌼</h2>
-                    <p>One thing at a time.</p>
-                  </div>
-
-                  <span className="plan-date">TODAY</span>
-                </div>
-
-                {dashboardData.loading ? (
-                  <p>Loading today's timetable...</p>
-                ) : dashboardData.errors.timetable ? (
-                  <p>Unable to load today's timetable.</p>
-                ) : dashboardData.todayClasses.length === 0 ? (
-                  <p className="no-classes-message">
-                    No classes are scheduled for today. Enjoy your day! 🌷
-                  </p>
-                ) : (
-                  dashboardData.todayClasses.map((item) => (
-                    <div className="task-item" key={item.id}>
-                      <div className="task-time">
-                        {formatScheduleTime(item.start_time)}
-                        {item.end_time
-                          ? ` – ${formatScheduleTime(item.end_time)}`
-                          : ""}
-                      </div>
-
-                      <div className="task-details">
-                        <h3>{item.subject || "Class"}</h3>
-                        <p>
-                          {item.teacher_name
-                            ? `Teacher: ${item.teacher_name}`
-                            : item.notes || "Scheduled class"}
-                        </p>
-                        {item.meeting_link && (
-                          <a
-                            className="task-meeting-link"
-                            href={item.meeting_link}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Join class →
-                          </a>
-                        )}
-                      </div>
-
-                      <span className="task-emoji">📚</span>
-                    </div>
-                  ))
-                )}
-
-                <button
-                  className="secondary-button"
-                  onClick={() => setActiveTab("Timetable")}
-                >
-                  See my timetable →
-                </button>
-              </div>
-            </section>
-
-            <section className="panel dashboard-announcements">
+<section className="panel dashboard-announcements">
               <div className="panel-heading">
                 <div>
                   <h2>📢 Latest Announcements</h2>
@@ -933,7 +928,7 @@ useEffect(() => {
               )}
             </section>
 
-            <section className="bottom-banner">
+<section className="bottom-banner">
               <div className="banner-emoji">🌈</div>
 
               <div>
