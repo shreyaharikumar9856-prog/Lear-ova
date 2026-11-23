@@ -160,6 +160,18 @@ function TestMaker() {
       setStudents(studentResult.data || []);
       setTests(testResult.data || []);
 
+      // Prefill the teacher name from the signed-in account.
+      if (!teacherName.trim()) {
+        const { data: authData } = await supabase.auth.getUser();
+        const user = authData?.user;
+        const profileName =
+          user?.user_metadata?.full_name ||
+          user?.user_metadata?.name ||
+          user?.email?.split("@")[0] ||
+          "";
+        if (profileName) setTeacherName(profileName);
+      }
+
       if (
         !subjectId &&
         subjectResult.data?.length
@@ -701,10 +713,6 @@ function TestMaker() {
         throw new Error("Select a subject.");
       }
 
-      if (!teacherName.trim()) {
-        throw new Error("Enter the teacher's name.");
-      }
-
       if (selectedStudentIds.length === 0) {
         throw new Error("Select at least one student.");
       }
@@ -719,6 +727,13 @@ function TestMaker() {
 
      if (assessmentType === "practice" && Number(duration) < 0) {
        throw new Error("Duration cannot be negative.");
+      }
+
+      if (
+        allowMultipleAttempts &&
+        (!Number.isInteger(Number(maxAttempts)) || Number(maxAttempts) < 2)
+      ) {
+        throw new Error("Maximum attempts must be a whole number of at least 2.");
       }
 
       if (startDate && endDate) {
@@ -739,6 +754,10 @@ function TestMaker() {
         throw new Error(
           "Passing marks cannot exceed total marks."
         );
+      }
+
+      if (testMode === "upload" && !questionPaper) {
+        throw new Error("Upload the question paper for Uploaded Question Paper mode.");
       }
 
       if (
@@ -1731,6 +1750,21 @@ function TestMaker() {
           3. Test Settings
         </h4>
         <div className="tm-grid">
+
+  <div className="tm-field">
+    <label>Test Delivery Mode *</label>
+    <select
+      value={testMode}
+      onChange={(event) => setTestMode(event.target.value)}
+    >
+      <option value="online">Online Test</option>
+      <option value="upload">Uploaded Question Paper</option>
+      <option value="hybrid">Online + Uploaded Paper</option>
+    </select>
+    <small>
+      Choose online answering, an uploaded paper, or both.
+    </small>
+  </div>
 
   <div className="tm-field">
     <label>Assessment Type *</label>
