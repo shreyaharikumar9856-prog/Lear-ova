@@ -50,6 +50,8 @@ function createQuestion(type = "mcq") {
   };
 }
 
+const TEST_MAKER_DRAFT_KEY = "learnova_test_maker_draft_v1";
+
 function TestMaker() {
   // =====================================
   // DATA STATES
@@ -63,6 +65,7 @@ function TestMaker() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("success");
+  const [draftReady, setDraftReady] = useState(false);
 
   // =====================================
   // TEST FORM STATES
@@ -109,6 +112,73 @@ function TestMaker() {
   const [questions, setQuestions] = useState([
     createQuestion("mcq"),
   ]);
+
+  // Restore an unfinished test when the page is reloaded or the browser
+  // discards this tab to save memory. Uploaded File objects cannot be stored
+  // in localStorage, so the teacher will be asked to select that file again.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(TEST_MAKER_DRAFT_KEY);
+      if (saved) {
+        const draft = JSON.parse(saved);
+        if (draft && typeof draft === "object") {
+          if (typeof draft.title === "string") setTitle(draft.title);
+          if (draft.subjectId != null) setSubjectId(String(draft.subjectId));
+          if (typeof draft.grade === "string") setGrade(draft.grade);
+          if (typeof draft.description === "string") setDescription(draft.description);
+          if (typeof draft.teacherName === "string") setTeacherName(draft.teacherName);
+          if (typeof draft.assessmentType === "string") setAssessmentType(draft.assessmentType);
+          if (typeof draft.testMode === "string") setTestMode(draft.testMode);
+          if (draft.duration != null) setDuration(draft.duration);
+          if (draft.passingMarks != null) setPassingMarks(draft.passingMarks);
+          if (typeof draft.startDate === "string") setStartDate(draft.startDate);
+          if (typeof draft.endDate === "string") setEndDate(draft.endDate);
+          if (typeof draft.allowMultipleAttempts === "boolean") setAllowMultipleAttempts(draft.allowMultipleAttempts);
+          if (draft.maxAttempts != null) setMaxAttempts(draft.maxAttempts);
+          if (typeof draft.shuffleQuestions === "boolean") setShuffleQuestions(draft.shuffleQuestions);
+          if (typeof draft.shuffleOptions === "boolean") setShuffleOptions(draft.shuffleOptions);
+          if (typeof draft.resultRelease === "string") setResultRelease(draft.resultRelease);
+          if (typeof draft.testStatus === "string") setTestStatus(draft.testStatus);
+          if (Array.isArray(draft.selectedStudentIds)) setSelectedStudentIds(draft.selectedStudentIds.map(String));
+          if (Array.isArray(draft.questions) && draft.questions.length) setQuestions(draft.questions);
+          if (draft.hadQuestionPaper) {
+            setMessage("Your test draft was restored. Please select the question paper file again.");
+            setMessageType("error");
+          } else {
+            setMessage("Your unfinished test draft was restored.");
+            setMessageType("success");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Unable to restore Test Maker draft:", error);
+    } finally {
+      setDraftReady(true);
+    }
+  }, []);
+
+  // Save the form after every edit. This protects against tab reloads and
+  // mobile browsers unloading a background tab. The draft stays on this device.
+  useEffect(() => {
+    if (!draftReady) return;
+    const draft = {
+      title, subjectId, grade, description, teacherName, assessmentType,
+      testMode, duration, passingMarks, startDate, endDate,
+      allowMultipleAttempts, maxAttempts, shuffleQuestions, shuffleOptions,
+      resultRelease, testStatus, selectedStudentIds, questions,
+      hadQuestionPaper: Boolean(questionPaper),
+    };
+    try {
+      localStorage.setItem(TEST_MAKER_DRAFT_KEY, JSON.stringify(draft));
+    } catch (error) {
+      console.error("Unable to save Test Maker draft:", error);
+      setMessage("Draft could not be saved on this device. Please keep a backup of your questions.");
+      setMessageType("error");
+    }
+  }, [draftReady, title, subjectId, grade, description, teacherName,
+      assessmentType, testMode, duration, passingMarks, startDate, endDate,
+      allowMultipleAttempts, maxAttempts, shuffleQuestions, shuffleOptions,
+      resultRelease, testStatus, selectedStudentIds, questions, questionPaper]);
 
   const totalMarks = questions.reduce(
     (total, question) =>
@@ -159,18 +229,6 @@ function TestMaker() {
       setSubjects(subjectResult.data || []);
       setStudents(studentResult.data || []);
       setTests(testResult.data || []);
-
-      // Prefill the teacher name from the signed-in account.
-      if (!teacherName.trim()) {
-        const { data: authData } = await supabase.auth.getUser();
-        const user = authData?.user;
-        const profileName =
-          user?.user_metadata?.full_name ||
-          user?.user_metadata?.name ||
-          user?.email?.split("@")[0] ||
-          "";
-        if (profileName) setTeacherName(profileName);
-      }
 
       if (
         !subjectId &&
@@ -713,6 +771,10 @@ function TestMaker() {
         throw new Error("Select a subject.");
       }
 
+      if (!teacherName.trim()) {
+        throw new Error("Enter the teacher's name.");
+      }
+
       if (selectedStudentIds.length === 0) {
         throw new Error("Select at least one student.");
       }
@@ -727,13 +789,6 @@ function TestMaker() {
 
      if (assessmentType === "practice" && Number(duration) < 0) {
        throw new Error("Duration cannot be negative.");
-      }
-
-      if (
-        allowMultipleAttempts &&
-        (!Number.isInteger(Number(maxAttempts)) || Number(maxAttempts) < 2)
-      ) {
-        throw new Error("Maximum attempts must be a whole number of at least 2.");
       }
 
       if (startDate && endDate) {
@@ -754,10 +809,6 @@ function TestMaker() {
         throw new Error(
           "Passing marks cannot exceed total marks."
         );
-      }
-
-      if (testMode === "upload" && !questionPaper) {
-        throw new Error("Upload the question paper for Uploaded Question Paper mode.");
       }
 
       if (
@@ -911,6 +962,11 @@ function TestMaker() {
         .insert(assignments);
 
       if (assignmentError) throw assignmentError;
+
+      // The test and assignments were saved successfully; clear this draft.
+      try { localStorage.removeItem(TEST_MAKER_DRAFT_KEY); } catch (storageError) {
+        console.warn("Could not clear saved Test Maker draft:", storageError);
+      }
 
       // RESET FORM
 
@@ -1750,21 +1806,6 @@ function TestMaker() {
           3. Test Settings
         </h4>
         <div className="tm-grid">
-
-  <div className="tm-field">
-    <label>Test Delivery Mode *</label>
-    <select
-      value={testMode}
-      onChange={(event) => setTestMode(event.target.value)}
-    >
-      <option value="online">Online Test</option>
-      <option value="upload">Uploaded Question Paper</option>
-      <option value="hybrid">Online + Uploaded Paper</option>
-    </select>
-    <small>
-      Choose online answering, an uploaded paper, or both.
-    </small>
-  </div>
 
   <div className="tm-field">
     <label>Assessment Type *</label>
