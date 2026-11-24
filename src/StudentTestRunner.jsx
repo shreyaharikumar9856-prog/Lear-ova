@@ -86,7 +86,7 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
           )
         );
     }
-  }
+  } 
 
   function getAnsweredCount() {
     return questions.filter((question) =>
