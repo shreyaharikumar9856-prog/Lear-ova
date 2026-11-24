@@ -18,18 +18,35 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
 
+  // Image upload state
+  const [uploadingImages, setUploadingImages] = useState({});
+  const [imagePreviewUrls, setImagePreviewUrls] = useState({});
+
   const answersRef = useRef({});
   const saveTimersRef = useRef({});
   const savePromisesRef = useRef({});
   const dirtyAnswersRef = useRef(new Set());
 
+  const uploadPromisesRef = useRef({});
+
   const submitStartedRef = useRef(false);
 
   const currentQuestion = questions[currentIndex];
 
+  const BUCKET_NAME = "test-materials";
+  const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
   // ==========================================
   // HELPER FUNCTIONS
   // ==========================================
+
+  function isWrittenQuestion(question) {
+    return [
+      "short_answer",
+      "long_answer",
+      "diagram_label",
+    ].includes(question.question_type);
+  }
 
   function isAnswered(question, answer) {
     if (!answer) return false;
@@ -59,7 +76,13 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
         return Boolean(answer.text?.trim());
 
       default:
-        return Boolean(answer.text?.trim());
+        return Boolean(
+          answer.text?.trim() ||
+          (
+            isWrittenQuestion(question) &&
+            answer.image_paths?.length > 0
+          )
+        );
     }
   }
 
@@ -76,6 +99,37 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
     return `${String(minutes).padStart(2, "0")}:${String(
       remainingSeconds
     ).padStart(2, "0")}`;
+  }
+
+  async function getImagePreviewUrl(path) {
+    const { data, error: urlError } =
+      await supabase.storage
+        .from(BUCKET_NAME)
+        .createSignedUrl(path, 60 * 60);
+
+    if (urlError) throw urlError;
+
+    return data.signedUrl;
+  }
+
+  async function loadImagePreviews(savedAnswers) {
+    const previews = {};
+
+    for (const [questionId, answer] of Object.entries(savedAnswers)) {
+      const paths = answer?.image_paths || [];
+
+      for (const path of paths) {
+        try {
+          const url = await getImagePreviewUrl(path);
+
+          previews[path] = url;
+        } catch (err) {
+          console.error("Could not load image preview:", err);
+        }
+      }
+    }
+
+    setImagePreviewUrls(previews);
   }
 
   // ==========================================
@@ -163,6 +217,9 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
       setAnswers(previousAnswers);
 
       answersRef.current = previousAnswers;
+
+      // Load previews for images saved in a resumed practice attempt.
+      await loadImagePreviews(previousAnswers);
 
       if (newAttempt.deadline_at) {
         const remaining = Math.max(
@@ -272,7 +329,278 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
     }, 600);
   }
 
-  // Save all pending answers before submission.
+  // ==========================================
+  // STUDENT IMAGE UPLOAD
+  // ==========================================
+
+  async function uploadAnswerImages(question, files) {
+    if (!attempt?.id || !question || !files?.length) return;
+
+    const questionId = question.id;
+
+    const uploadTask = (async () => {
+      setError("");
+
+      try {
+        const { data: userData, error: userError } =
+          await supabase.auth.getUser();
+
+        if (userError) throw userError;
+
+        const user = userData?.user;
+
+        if (!user) {
+          throw new Error(
+            "Your session has expired. Please sign in again."
+          );
+        }
+
+        setUploadingImages((previous) => ({
+          ...previous,
+          [questionId]: true,
+        }));
+
+        const uploadedPaths = [];
+
+        for (const file of files) {
+          if (!file.type.startsWith("image/")) {
+            throw new Error(
+              "Please select image files only."
+            );
+          }
+
+          if (file.size > MAX_IMAGE_SIZE) {
+            throw new Error(
+              `${file.name} is larger than 5 MB. Please choose a smaller image.`
+            );
+          }
+
+          const safeName = file.name.replace(
+            /[^a-zA-Z0-9._-]/g,
+            "_"
+          );
+
+          const uniqueName =
+            `${crypto.randomUUID()}-${safeName}`;
+
+          // The first folder is the authenticated user's ID.
+          const storagePath =
+            `${user.id}/${attempt.id}/${questionId}/${uniqueName}`;
+
+          const { error: uploadError } =
+            await supabase.storage
+              .from(BUCKET_NAME)
+              .upload(storagePath, file, {
+                contentType: file.type,
+                upsert: false,
+              });
+
+          if (uploadError) throw uploadError;
+
+          uploadedPaths.push(storagePath);
+
+          try {
+            const previewUrl =
+              await getImagePreviewUrl(storagePath);
+
+            setImagePreviewUrls((previous) => ({
+              ...previous,
+              [storagePath]: previewUrl,
+            }));
+          } catch (previewError) {
+            console.error(
+              "Image uploaded but preview could not be created:",
+              previewError
+            );
+          }
+        }
+
+        // Always use the latest answer to avoid overwriting typed text.
+        const latestAnswer =
+          answersRef.current[questionId] || {};
+
+        const existingPaths =
+          latestAnswer.image_paths || [];
+
+        const updatedAnswer = {
+          ...latestAnswer,
+          image_paths: [
+            ...existingPaths,
+            ...uploadedPaths,
+          ],
+        };
+
+        handleAnswerChange(questionId, updatedAnswer);
+
+      } catch (err) {
+        console.error("Image upload failed:", err);
+
+        setError(
+          err.message ||
+          "Unable to upload the image. Please try again."
+        );
+
+      } finally {
+        setUploadingImages((previous) => ({
+          ...previous,
+          [questionId]: false,
+        }));
+      }
+    })();
+
+    uploadPromisesRef.current[questionId] = uploadTask;
+
+    try {
+      await uploadTask;
+    } finally {
+      if (
+        uploadPromisesRef.current[questionId] === uploadTask
+      ) {
+        delete uploadPromisesRef.current[questionId];
+      }
+    }
+  }
+
+  async function removeAnswerImage(questionId, path) {
+    if (!attempt?.id) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to remove this image?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setError("");
+
+      const { error: removeError } =
+        await supabase.storage
+          .from(BUCKET_NAME)
+          .remove([path]);
+
+      if (removeError) throw removeError;
+
+      const latestAnswer =
+        answersRef.current[questionId] || {};
+
+      const updatedPaths =
+        (latestAnswer.image_paths || []).filter(
+          (item) => item !== path
+        );
+
+      const updatedAnswer = {
+        ...latestAnswer,
+        image_paths: updatedPaths,
+      };
+
+      setImagePreviewUrls((previous) => {
+        const updated = { ...previous };
+        delete updated[path];
+        return updated;
+      });
+
+      handleAnswerChange(questionId, updatedAnswer);
+
+    } catch (err) {
+      console.error("Image removal failed:", err);
+
+      setError(
+        err.message ||
+        "Unable to remove this image. Please try again."
+      );
+    }
+  }
+
+  function renderAnswerImageSection(question) {
+    if (!isWrittenQuestion(question)) return null;
+
+    const answer = answers[question.id] || {};
+    const imagePaths = answer.image_paths || [];
+    const isUploading = Boolean(
+      uploadingImages[question.id]
+    );
+
+    return (
+      <div className="runner-image-upload-section">
+        <label className="runner-image-upload-label">
+          Attach images of your answer
+        </label>
+
+        <p className="runner-image-upload-hint">
+          You can upload photos of handwritten answers,
+          diagrams, or working. Maximum 5 MB per image.
+        </p>
+
+        <label
+          className={[
+            "runner-image-upload-button",
+            isUploading ? "uploading" : "",
+          ].join(" ")}
+        >
+          {isUploading
+            ? "Uploading image..."
+            : "+ Add image"}
+
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            disabled={isUploading || submitting}
+            onChange={(event) => {
+              const selectedFiles = Array.from(
+                event.target.files || []
+              );
+
+              uploadAnswerImages(
+                question,
+                selectedFiles
+              );
+
+              // Allows selecting the same image again if needed.
+              event.target.value = "";
+            }}
+          />
+        </label>
+
+        {imagePaths.length > 0 && (
+          <div className="runner-image-preview-grid">
+            {imagePaths.map((path) => (
+              <div
+                className="runner-image-preview-item"
+                key={path}
+              >
+                {imagePreviewUrls[path] ? (
+                  <img
+                    src={imagePreviewUrls[path]}
+                    alt="Uploaded answer"
+                  />
+                ) : (
+                  <div className="runner-image-loading">
+                    Loading image...
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    removeAnswerImage(question.id, path)
+                  }
+                  disabled={submitting || isUploading}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ==========================================
+  // SAVE ALL PENDING ANSWERS
+  // ==========================================
+
   async function flushPendingAnswers() {
     const questionIds = [
       ...dirtyAnswersRef.current,
@@ -315,8 +643,6 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
     const unansweredCount =
       questions.length - answeredCount;
 
-    // Manual examination submission requires
-    // every question to be answered.
     if (
       isExam &&
       trigger === "manual" &&
@@ -344,6 +670,11 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
     setError("");
 
     try {
+      // Wait for image uploads to finish before saving answers.
+      await Promise.all(
+        Object.values(uploadPromisesRef.current)
+      );
+
       await flushPendingAnswers();
 
       const { data, error: submitError } =
@@ -363,39 +694,58 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
         throw new Error(data.error);
       }
 
-      // Submission is saved. Mark it submitted before grading so a
-      // grading failure never makes the student submit the same test again.
       setSubmitted(true);
-      setStatusMessage("Your submission was saved. Grading is processing...");
+      setStatusMessage(
+        "Your submission was saved. Grading is processing..."
+      );
 
-      // Run automatic grading using the student's authenticated Supabase session.
-      // Written questions are handled by the teacher-review workflow.
+      // Run automatic grading.
       try {
         const { data: gradingData, error: gradingError } =
-          await supabase.functions.invoke("grade-test-attempt", {
-            body: {
-              attempt_id: attempt.id,
-            },
-          });
+          await supabase.functions.invoke(
+            "grade-test-attempt",
+            {
+              body: {
+                attempt_id: attempt.id,
+              },
+            }
+          );
 
         if (gradingError) {
-          console.error("Automatic grading invocation failed:", gradingError);
+          console.error(
+            "Automatic grading invocation failed:",
+            gradingError
+          );
+
           setStatusMessage(
             "Your submission was saved. Automatic grading needs to be retried."
           );
-        } else if (gradingData?.success === false || gradingData?.error) {
-          console.error("Automatic grading did not complete:", gradingData);
+
+        } else if (
+          gradingData?.success === false ||
+          gradingData?.error
+        ) {
+          console.error(
+            "Automatic grading did not complete:",
+            gradingData
+          );
+
           setStatusMessage(
             "Your submission was saved. Automatic grading needs to be retried."
           );
+
         } else {
           setStatusMessage(
             "Your submission was saved. Grading has been processed."
           );
         }
+
       } catch (gradingErr) {
-        // Do not roll back or mark the already-saved submission as failed.
-        console.error("Automatic grading failed after submission:", gradingErr);
+        console.error(
+          "Automatic grading failed after submission:",
+          gradingErr
+        );
+
         setStatusMessage(
           "Your submission was saved. Automatic grading needs to be retried."
         );
@@ -425,9 +775,9 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
   // ==========================================
 
   useEffect(() => {
-   if (!attempt?.deadline_at || submitted) {
-  return;
-}
+    if (!attempt?.deadline_at || submitted) {
+      return;
+    }
 
     const updateTimer = () => {
       const remaining = Math.max(
@@ -911,6 +1261,8 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
 
               <div className="runner-answer-area">
                 {renderQuestionInput(currentQuestion)}
+
+                {renderAnswerImageSection(currentQuestion)}
               </div>
 
               <div className="runner-navigation">
@@ -982,7 +1334,11 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
             type="button"
             className="runner-submit-button"
             onClick={() => submitTest("manual")}
-            disabled={submitting || saving}
+            disabled={
+              submitting ||
+              saving ||
+              Object.values(uploadingImages).some(Boolean)
+            }
           >
             {submitting
               ? "Submitting..."
@@ -1154,6 +1510,102 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
           align-items: center;
           gap: 15px;
           margin-bottom: 13px;
+        }
+
+        /* Student image upload */
+
+        .runner-image-upload-section {
+          margin-top: 22px;
+          padding: 17px;
+          border: 1px dashed #d9c5df;
+          border-radius: 13px;
+          background: #fcf9fd;
+        }
+
+        .runner-image-upload-label {
+          display: block;
+          font-weight: 700;
+          font-size: 14px;
+          color: #654b70;
+          margin-bottom: 6px;
+        }
+
+        .runner-image-upload-hint {
+          font-size: 12px;
+          line-height: 1.5;
+          color: #927a99;
+          margin: 0 0 13px;
+        }
+
+        .runner-image-upload-button {
+          display: inline-block;
+          padding: 10px 15px;
+          border-radius: 9px;
+          background: #f1e8f4;
+          color: #654b70;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .runner-image-upload-button.uploading {
+          opacity: 0.6;
+          cursor: wait;
+        }
+
+        .runner-image-upload-button input {
+          display: none;
+        }
+
+        .runner-image-preview-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+          gap: 12px;
+          margin-top: 16px;
+        }
+
+        .runner-image-preview-item {
+          min-width: 0;
+          padding: 8px;
+          background: white;
+          border: 1px solid #eadfec;
+          border-radius: 10px;
+        }
+
+        .runner-image-preview-item img {
+          display: block;
+          width: 100%;
+          height: 115px;
+          object-fit: contain;
+          border-radius: 7px;
+          background: #f8f5f9;
+        }
+
+        .runner-image-preview-item button {
+          width: 100%;
+          margin-top: 8px;
+          padding: 7px;
+          border: 0;
+          border-radius: 7px;
+          background: #fff0f1;
+          color: #a13f55;
+          font-size: 12px;
+          cursor: pointer;
+        }
+
+        .runner-image-preview-item button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .runner-image-loading {
+          height: 115px;
+          display: grid;
+          place-items: center;
+          background: #f8f5f9;
+          color: #927a99;
+          font-size: 12px;
+          border-radius: 7px;
         }
 
         .runner-navigation {
