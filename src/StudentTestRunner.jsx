@@ -21,6 +21,8 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
   // Image upload state
   const [uploadingImages, setUploadingImages] = useState({});
   const [imagePreviewUrls, setImagePreviewUrls] = useState({});
+  const [questionImageUrls, setQuestionImageUrls] = useState({});
+  const [questionImageErrors, setQuestionImageErrors] = useState({});
 
   const answersRef = useRef({});
   const saveTimersRef = useRef({});
@@ -132,6 +134,32 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
     setImagePreviewUrls(previews);
   }
 
+  async function loadQuestionImagePreviews(questionData) {
+    const previews = {};
+    const failed = {};
+
+    for (const question of questionData || []) {
+      const imagePath = question.settings?.question_image_path;
+
+      if (!imagePath) continue;
+
+      try {
+        const url = await getImagePreviewUrl(imagePath);
+        previews[question.id] = url;
+      } catch (err) {
+        // Keep the test usable even if one optional image cannot be loaded.
+        failed[question.id] = true;
+        console.error(
+          `Could not load the image for question ${question.question_order}:`,
+          err
+        );
+      }
+    }
+
+    setQuestionImageUrls(previews);
+    setQuestionImageErrors(failed);
+  }
+
   // ==========================================
   // START TEST
   // ==========================================
@@ -218,8 +246,13 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
 
       answersRef.current = previousAnswers;
 
-      // Load previews for images saved in a resumed practice attempt.
-      await loadImagePreviews(previousAnswers);
+      // Load student answer previews and teacher-provided question images.
+      // A question image preview failure must not prevent the student
+      // from starting or completing the test.
+      await Promise.all([
+        loadImagePreviews(previousAnswers),
+        loadQuestionImagePreviews(questionData),
+      ]);
 
       if (newAttempt.deadline_at) {
         const remaining = Math.max(
@@ -1259,6 +1292,21 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
 
               <h3>{currentQuestion.question_text}</h3>
 
+              {questionImageUrls[currentQuestion.id] && (
+                <div className="runner-question-image">
+                  <img
+                    src={questionImageUrls[currentQuestion.id]}
+                    alt={`Image for question ${currentIndex + 1}`}
+                  />
+                </div>
+              )}
+
+              {questionImageErrors[currentQuestion.id] && (
+                <p className="runner-hint">
+                  The question image could not be loaded. Please inform your teacher.
+                </p>
+              )}
+
               <div className="runner-answer-area">
                 {renderQuestionInput(currentQuestion)}
 
@@ -1464,6 +1512,29 @@ function StudentTestRunner({ test, onBack, onSubmitted }) {
           font-size: 19px;
           line-height: 1.6;
           margin-bottom: 24px;
+        }
+
+        .runner-question-image {
+          width: 100%;
+          margin: 0 0 22px;
+          padding: 12px;
+          box-sizing: border-box;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          background: #fcf9fd;
+          border: 1px solid #eadfec;
+          border-radius: 13px;
+        }
+
+        .runner-question-image img {
+          display: block;
+          max-width: 100%;
+          max-height: 420px;
+          width: auto;
+          height: auto;
+          object-fit: contain;
+          border-radius: 8px;
         }
 
         .runner-option {
