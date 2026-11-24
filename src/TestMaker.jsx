@@ -47,6 +47,8 @@ function createQuestion(type = "mcq") {
 
     model_answer: "",
     keywords: "",
+    question_image_file: null,
+    question_image_preview_url: "",
   };
 }
 
@@ -140,9 +142,24 @@ function TestMaker() {
           if (typeof draft.resultRelease === "string") setResultRelease(draft.resultRelease);
           if (typeof draft.testStatus === "string") setTestStatus(draft.testStatus);
           if (Array.isArray(draft.selectedStudentIds)) setSelectedStudentIds(draft.selectedStudentIds.map(String));
-          if (Array.isArray(draft.questions) && draft.questions.length) setQuestions(draft.questions);
-          if (draft.hadQuestionPaper) {
-            setMessage("Your test draft was restored. Please select the question paper file again.");
+          if (Array.isArray(draft.questions) && draft.questions.length) {
+            setQuestions(
+              draft.questions.map((question) => ({
+                ...question,
+                question_image_file: null,
+                question_image_preview_url: "",
+              }))
+            );
+          }
+
+          if (draft.hadQuestionPaper || draft.hadQuestionImages) {
+            const missingFiles = [];
+            if (draft.hadQuestionPaper) missingFiles.push("the question paper");
+            if (draft.hadQuestionImages) missingFiles.push("question images");
+
+            setMessage(
+              `Your test draft was restored. Please select ${missingFiles.join(" and ")} again.`
+            );
             setMessageType("error");
           } else {
             setMessage("Your unfinished test draft was restored.");
@@ -165,8 +182,20 @@ function TestMaker() {
       title, subjectId, grade, description, teacherName, assessmentType,
       testMode, duration, passingMarks, startDate, endDate,
       allowMultipleAttempts, maxAttempts, shuffleQuestions, shuffleOptions,
-      resultRelease, testStatus, selectedStudentIds, questions,
+      resultRelease, testStatus, selectedStudentIds,
+      questions: questions.map((question) => {
+        const {
+          question_image_file,
+          question_image_preview_url,
+          ...savedQuestion
+        } = question;
+
+        return savedQuestion;
+      }),
       hadQuestionPaper: Boolean(questionPaper),
+      hadQuestionImages: questions.some(
+        (question) => Boolean(question.question_image_file)
+      ),
     };
     try {
       localStorage.setItem(TEST_MAKER_DRAFT_KEY, JSON.stringify(draft));
@@ -302,6 +331,61 @@ function TestMaker() {
           question_text: question.question_text,
           marks: question.marks,
           negative_marks: question.negative_marks,
+          question_image_file: question.question_image_file || null,
+          question_image_preview_url:
+            question.question_image_preview_url || "",
+        };
+      })
+    );
+  }
+
+  function handleQuestionImageChange(index, file) {
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setMessage("Please select an image file.");
+      setMessageType("error");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage("Question images must be 5 MB or smaller.");
+      setMessageType("error");
+      return;
+    }
+
+    setQuestions((previous) =>
+      previous.map((question, i) => {
+        if (i !== index) return question;
+
+        if (question.question_image_preview_url) {
+          URL.revokeObjectURL(question.question_image_preview_url);
+        }
+
+        return {
+          ...question,
+          question_image_file: file,
+          question_image_preview_url: URL.createObjectURL(file),
+        };
+      })
+    );
+
+    setMessage("");
+  }
+
+  function removeQuestionImage(index) {
+    setQuestions((previous) =>
+      previous.map((question, i) => {
+        if (i !== index) return question;
+
+        if (question.question_image_preview_url) {
+          URL.revokeObjectURL(question.question_image_preview_url);
+        }
+
+        return {
+          ...question,
+          question_image_file: null,
+          question_image_preview_url: "",
         };
       })
     );
@@ -761,6 +845,7 @@ function TestMaker() {
 
     let createdTestId = null;
     let uploadedPaperPath = null;
+    const uploadedQuestionImagePaths = [];
 
     try {
       if (!title.trim()) {
@@ -897,11 +982,33 @@ function TestMaker() {
         if (paperUpdateError) throw paperUpdateError;
       }
 
-      // INSERT QUESTIONS
+      // Prepare each image path before inserting questions so the path
+      // can be saved in settings during the original INSERT.
+      const questionImagePaths = questions.map((question, index) => {
+        const imageFile = question.question_image_file;
+        if (!imageFile) return null;
 
+        const safeName = imageFile.name.replace(
+          /[^a-zA-Z0-9._-]/g,
+          "_"
+        );
+
+        return (
+          `${createdTestId}/question-${index + 1}/` +
+          `${crypto.randomUUID()}-${safeName}`
+        );
+      });
+
+      // INSERT QUESTIONS
       const questionRows = questions.map(
         (question, index) => {
           const data = buildQuestionData(question, index);
+          const settings = {
+            ...(data.settings || {}),
+            ...(questionImagePaths[index]
+              ? { question_image_path: questionImagePaths[index] }
+              : {}),
+          };
 
           return {
             test_id: createdTestId,
@@ -911,7 +1018,7 @@ function TestMaker() {
             marks: data.marks,
             negative_marks: data.negative_marks,
             question_order: data.question_order,
-            settings: data.settings,
+            settings,
           };
         }
       );
@@ -927,6 +1034,29 @@ function TestMaker() {
       const sortedInserted = [...insertedQuestions].sort(
         (a, b) => a.question_order - b.question_order
       );
+
+      // UPLOAD QUESTION IMAGES (OPTIONAL)
+      // The test ID stays in the first folder so the existing assigned-test
+      // storage policy can identify which test the image belongs to.
+      // The image path was already saved in test_questions.settings above.
+      for (let index = 0; index < questionImagePaths.length; index++) {
+        const imagePath = questionImagePaths[index];
+        const imageFile = questions[index].question_image_file;
+
+        if (!imagePath || !imageFile) continue;
+
+        const { error: imageUploadError } = await supabase.storage
+          .from("test-materials")
+          .upload(imagePath, imageFile, {
+            cacheControl: "3600",
+            contentType: imageFile.type,
+            upsert: false,
+          });
+
+        if (imageUploadError) throw imageUploadError;
+
+        uploadedQuestionImagePaths.push(imagePath);
+      }
 
       // INSERT ANSWER KEYS
 
@@ -1028,6 +1158,19 @@ function TestMaker() {
         await supabase.storage
           .from("test-materials")
           .remove([uploadedPaperPath]);
+      }
+
+      if (uploadedQuestionImagePaths.length > 0) {
+        const { error: imageCleanupError } = await supabase.storage
+          .from("test-materials")
+          .remove(uploadedQuestionImagePaths);
+
+        if (imageCleanupError) {
+          console.error(
+            "Question image cleanup error:",
+            imageCleanupError.message
+          );
+        }
       }
 
       setMessage(
@@ -1140,6 +1283,68 @@ function TestMaker() {
 
         </div>
 
+        {/* OPTIONAL QUESTION IMAGE - AVAILABLE FOR EVERY QUESTION TYPE */}
+        <div
+          className="tm-field"
+          style={{
+            marginTop: "14px",
+            padding: "16px",
+            border: "1px dashed #d9c5df",
+            borderRadius: "12px",
+            background: "#fcf9fd",
+          }}
+        >
+          <label>Question Image (Optional)</label>
+
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(event) => {
+              const file = event.target.files?.[0] || null;
+              if (file) handleQuestionImageChange(index, file);
+              event.target.value = "";
+            }}
+          />
+
+          <small>
+            Add a picture, diagram, map, graph, or other visual for this question.
+            Maximum size: 5 MB.
+          </small>
+
+          {question.question_image_preview_url && (
+            <div
+              style={{
+                marginTop: "12px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                gap: "10px",
+              }}
+            >
+              <img
+                src={question.question_image_preview_url}
+                alt={`Preview for question ${index + 1}`}
+                style={{
+                  display: "block",
+                  maxWidth: "100%",
+                  maxHeight: "260px",
+                  objectFit: "contain",
+                  borderRadius: "10px",
+                  border: "1px solid #eadfec",
+                  background: "#ffffff",
+                }}
+              />
+
+              <button
+                type="button"
+                className="tm-secondary-button"
+                onClick={() => removeQuestionImage(index)}
+              >
+                Remove Image
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* MARK SETTINGS */}
 
