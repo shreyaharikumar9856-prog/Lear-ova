@@ -1,749 +1,367 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 
-function ReportCards() {
+export default function CoinManagement() {
   const [students, setStudents] = useState([]);
-  const [studentId, setStudentId] = useState("");
-  const [period, setPeriod] = useState("monthly");
+  const [transactions, setTransactions] = useState([]);
+  const [balances, setBalances] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
 
-  const today = new Date();
-  const firstDay = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    1
-  ).toISOString().slice(0, 10);
+  const [form, setForm] = useState({
+    student_id: "",
+    transaction_type: "Earned",
+    coins: "",
+    activity: "Teacher Bonus",
+    reason: "",
+  });
 
-  const [startDate, setStartDate] = useState(firstDay);
-  const [endDate, setEndDate] = useState(
-    today.toISOString().slice(0, 10)
-  );
-
-  const [report, setReport] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [studentsLoading, setStudentsLoading] = useState(true);
-  const [error, setError] = useState("");
+  const monthStart = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  })();
 
   useEffect(() => {
-    loadStudents();
+    loadData();
   }, []);
 
-  async function loadStudents() {
-    setStudentsLoading(true);
-    setError("");
-
-    try {
-      const { data, error } = await supabase
-        .from("students")
-        .select("id, full_name, email")
-        .order("full_name");
-
-      if (error) throw error;
-
-      setStudents(data || []);
-
-      if (data?.length) {
-        setStudentId(data[0].id);
-      }
-    } catch (err) {
-      console.error("Student loading error:", err);
-      setError(err.message);
-    } finally {
-      setStudentsLoading(false);
-    }
-  }
-
-  function handlePeriodChange(value) {
-    setPeriod(value);
-
-    const now = new Date();
-
-    if (value === "monthly") {
-      setStartDate(
-        new Date(now.getFullYear(), now.getMonth(), 1)
-          .toISOString().slice(0, 10)
-      );
-      setEndDate(now.toISOString().slice(0, 10));
-    } else {
-      // Default term: current calendar quarter.
-      const quarterStartMonth =
-        Math.floor(now.getMonth() / 3) * 3;
-
-      setStartDate(
-        new Date(now.getFullYear(), quarterStartMonth, 1)
-          .toISOString().slice(0, 10)
-      );
-      setEndDate(now.toISOString().slice(0, 10));
-    }
-  }
-
-  async function generateReport() {
-    if (!studentId || !startDate || !endDate) {
-      setError("Please select a student and reporting period.");
-      return;
-    }
-
-    if (startDate > endDate) {
-      setError("Start date cannot be after end date.");
-      return;
-    }
-
+  async function loadData() {
     setLoading(true);
-    setError("");
-    setReport(null);
 
-    try {
-      const [
-        studentResult,
-        performanceResult,
-        attendanceResult,
-        assignmentsResult,
-      ] = await Promise.all([
-        supabase
-          .from("students")
-          .select("id, full_name, email")
-          .eq("id", studentId)
-          .single(),
+    const [studentResult, transactionResult] = await Promise.all([
+      supabase
+        .from("students")
+        .select("id, full_name")
+        .order("full_name"),
 
-        supabase
-          .from("student_performance")
-          .select("*")
-          .eq("student_id", studentId)
-          .gte("assessment_date", startDate)
-          .lte("assessment_date", endDate)
-          .order("assessment_date", { ascending: true }),
+      supabase
+        .from("coin_transactions")
+        .select("*")
+        .eq("month_start", monthStart)
+        .order("created_at", { ascending: false }),
+    ]);
 
-        supabase
-          .from("attendance")
-          .select("id, attendance_date, status, remarks")
-          .eq("student_id", studentId)
-          .gte("attendance_date", startDate)
-          .lte("attendance_date", endDate)
-          .order("attendance_date", { ascending: true }),
-
-        supabase
-          .from("assignments")
-          .select("id, title, subject, assigned_at, due_date")
-          .eq("student_id", studentId)
-          .gte("assigned_at", `${startDate}T00:00:00`)
-          .lte("assigned_at", `${endDate}T23:59:59`)
-          .order("assigned_at", { ascending: true }),
-      ]);
-
-      if (studentResult.error) throw studentResult.error;
-      if (performanceResult.error) throw performanceResult.error;
-      if (attendanceResult.error) throw attendanceResult.error;
-      if (assignmentsResult.error) throw assignmentsResult.error;
-
-      const assignments = assignmentsResult.data || [];
-
-      let submissions = [];
-
-      if (assignments.length > 0) {
-        const assignmentIds = assignments.map((item) => item.id);
-
-        const { data, error } = await supabase
-          .from("assignment_submissions")
-          .select(
-            "id, assignment_id, review_status, submitted_at"
-          )
-          .eq("student_id", studentId)
-          .in("assignment_id", assignmentIds)
-          .order("submitted_at", { ascending: false });
-
-        if (error) throw error;
-
-        submissions = data || [];
-      }
-
-      // Find the latest submission for each assignment.
-      const latestSubmissions = new Map();
-
-      submissions.forEach((submission) => {
-        const existing = latestSubmissions.get(
-          submission.assignment_id
-        );
-
-        if (
-          !existing ||
-          new Date(submission.submitted_at).getTime() >
-            new Date(existing.submitted_at).getTime()
-        ) {
-          latestSubmissions.set(
-            submission.assignment_id,
-            submission
-          );
-        }
-      });
-
-      const homeworkRows = assignments.map((assignment) => {
-        const submission = latestSubmissions.get(assignment.id);
-
-        return {
-          ...assignment,
-          status: submission?.review_status || "Not Submitted",
-        };
-      });
-
-      const performance = performanceResult.data || [];
-      const attendance = attendanceResult.data || [];
-
-      const tests = performance.filter(
-        (item) => item.category === "Test"
+    if (studentResult.error || transactionResult.error) {
+      setMessage(
+        studentResult.error?.message ||
+        transactionResult.error?.message
       );
-
-      const participation = performance.filter(
-        (item) => item.category === "Participation"
-      );
-
-      const totalObtained = tests.reduce(
-        (sum, item) => sum + Number(item.marks_obtained),
-        0
-      );
-
-      const totalMaximum = tests.reduce(
-        (sum, item) => sum + Number(item.max_marks),
-        0
-      );
-
-      const testAverage = totalMaximum > 0
-        ? (totalObtained / totalMaximum) * 100
-        : null;
-
-      const accepted = homeworkRows.filter(
-        (item) => item.status === "Accepted"
-      ).length;
-
-      const awaiting = homeworkRows.filter(
-        (item) => item.status === "Submitted"
-      ).length;
-
-      const recheck = homeworkRows.filter(
-        (item) => item.status === "Recheck Required"
-      ).length;
-
-      const notSubmitted = homeworkRows.filter(
-        (item) => item.status === "Not Submitted"
-      ).length;
-
-      const homeworkPercentage = homeworkRows.length
-        ? (accepted / homeworkRows.length) * 100
-        : null;
-
-      const present = attendance.filter(
-        (item) => item.status === "Present"
-      ).length;
-
-      const absent = attendance.filter(
-        (item) => item.status === "Absent"
-      ).length;
-
-      const attendancePercentage = attendance.length
-        ? (present / attendance.length) * 100
-        : null;
-
-      const participationObtained = participation.reduce(
-        (sum, item) => sum + Number(item.marks_obtained),
-        0
-      );
-
-      const participationMaximum = participation.reduce(
-        (sum, item) => sum + Number(item.max_marks),
-        0
-      );
-
-      const participationPercentage = participationMaximum > 0
-        ? (participationObtained / participationMaximum) * 100
-        : null;
-
-      setReport({
-        student: studentResult.data,
-        performance,
-        tests,
-        participation,
-        homeworkRows,
-        attendance,
-        testAverage,
-        homeworkPercentage,
-        participationPercentage,
-        accepted,
-        awaiting,
-        recheck,
-        notSubmitted,
-        present,
-        absent,
-        attendancePercentage,
-      });
-    } catch (err) {
-      console.error("Report generation error:", err);
-      setError(err.message || "Unable to generate report.");
-    } finally {
       setLoading(false);
+      return;
     }
+
+    const studentData = studentResult.data || [];
+    const transactionData = transactionResult.data || [];
+
+    setStudents(studentData);
+    setTransactions(transactionData);
+
+    const calculatedBalances = {};
+
+    studentData.forEach((student) => {
+      calculatedBalances[student.id] = 0;
+    });
+
+    transactionData.forEach((item) => {
+      const current = calculatedBalances[item.student_id] || 0;
+
+      calculatedBalances[item.student_id] =
+        current +
+        (item.transaction_type === "Earned"
+          ? item.coins
+          : -item.coins);
+    });
+
+    setBalances(calculatedBalances);
+    setLoading(false);
   }
 
-  function percentage(value) {
-    return value === null || value === undefined
-      ? "N/A"
-      : `${value.toFixed(1)}%`;
+  function handleChange(e) {
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value,
+    });
   }
 
-  function formatDate(value) {
-    if (!value) return "—";
+  async function submitTransaction(e) {
+    e.preventDefault();
+    setMessage("");
 
-    return new Date(`${value.slice(0, 10)}T00:00:00`)
-      .toLocaleDateString();
+    const coins = Number(form.coins);
+    const currentBalance = balances[form.student_id] || 0;
+
+    if (!Number.isInteger(coins) || coins <= 0) {
+      setMessage("Enter a valid positive whole number of coins.");
+      return;
+    }
+
+    if (!form.reason.trim()) {
+      setMessage("Please enter a reason for this transaction.");
+      return;
+    }
+
+    if (
+      form.transaction_type === "Deducted" &&
+      coins > currentBalance
+    ) {
+      setMessage(
+        `Insufficient balance. The student's current balance is ${currentBalance} coins.`
+      );
+      return;
+    }
+
+    const { error } = await supabase
+      .from("coin_transactions")
+      .insert({
+        student_id: form.student_id,
+        transaction_type: form.transaction_type,
+        coins,
+        activity: form.activity,
+        reason: form.reason.trim(),
+        month_start: monthStart,
+      });
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage(
+      form.transaction_type === "Earned"
+        ? `${coins} coins awarded successfully!`
+        : `${coins} coins deducted successfully!`
+    );
+
+    setForm({
+      student_id: "",
+      transaction_type: "Earned",
+      coins: "",
+      activity: "Teacher Bonus",
+      reason: "",
+    });
+
+    await loadData();
   }
 
-  function printReport() {
-    window.print();
+  function getStudentName(id) {
+    return (
+      students.find((student) => student.id === id)?.full_name ||
+      "Student"
+    );
   }
 
   const styles = {
     container: {
-      background: "#ffffff",
+      background: "#fff",
       padding: "24px",
       borderRadius: "16px",
       marginTop: "24px",
-      color: "#1e293b",
-      boxShadow: "0 4px 18px rgba(15,23,42,0.06)",
-      width: "100%",
-      boxSizing: "border-box",
-    },
-    heading: {
-      fontSize: "24px",
-      margin: "0 0 8px",
-    },
-    subtitle: {
-      color: "#64748b",
-      fontSize: "14px",
-      margin: 0,
-    },
-    controls: {
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
-      gap: "14px",
-      marginTop: "24px",
-      padding: "20px",
-      background: "#f8fafc",
-      borderRadius: "12px",
-    },
-    label: {
-      display: "flex",
-      flexDirection: "column",
-      gap: "8px",
-      fontSize: "13px",
-      fontWeight: 600,
+      boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
     },
     input: {
       width: "100%",
-      padding: "11px",
-      border: "1px solid #cbd5e1",
+      padding: "12px",
+      border: "1px solid #ddd",
       borderRadius: "8px",
-      background: "#ffffff",
       boxSizing: "border-box",
+      marginTop: "6px",
+      fontSize: "14px",
+    },
+    field: {
+      marginBottom: "16px",
     },
     button: {
-      padding: "12px 18px",
+      background: "#6658c7",
+      color: "#fff",
       border: "none",
+      padding: "12px 20px",
       borderRadius: "8px",
-      background: "#2563eb",
-      color: "#ffffff",
-      fontWeight: 600,
       cursor: "pointer",
-      marginTop: "12px",
+      fontWeight: "600",
     },
-    secondaryButton: {
-      padding: "11px 16px",
-      border: "1px solid #cbd5e1",
-      borderRadius: "8px",
-      background: "#ffffff",
-      cursor: "pointer",
-      fontWeight: 600,
-    },
-    error: {
-      background: "#fee2e2",
-      color: "#991b1b",
-      padding: "12px",
-      borderRadius: "8px",
-      marginTop: "16px",
-    },
-    report: {
-      marginTop: "28px",
-      border: "1px solid #e2e8f0",
-      borderRadius: "12px",
-      padding: "22px",
-    },
-    reportTitle: {
-      textAlign: "center",
-      paddingBottom: "18px",
-      borderBottom: "2px solid #e2e8f0",
-    },
-    stats: {
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
-      gap: "12px",
-      margin: "22px 0",
-    },
-    stat: {
-      background: "#f8fafc",
-      border: "1px solid #e2e8f0",
+    card: {
+      border: "1px solid #eee",
       padding: "16px",
-      borderRadius: "10px",
-    },
-    statLabel: {
-      display: "block",
-      color: "#64748b",
-      fontSize: "12px",
-      marginBottom: "8px",
-    },
-    statValue: {
-      fontSize: "23px",
-      fontWeight: 700,
-    },
-    sectionTitle: {
-      fontSize: "17px",
-      margin: "26px 0 12px",
-    },
-    tableWrapper: {
-      width: "100%",
-      overflowX: "auto",
-    },
-    table: {
-      width: "100%",
-      borderCollapse: "collapse",
-      fontSize: "13px",
-      textAlign: "left",
-    },
-    th: {
-      padding: "11px",
-      background: "#f1f5f9",
-      borderBottom: "1px solid #cbd5e1",
-      whiteSpace: "nowrap",
-    },
-    td: {
-      padding: "11px",
-      borderBottom: "1px solid #e2e8f0",
-    },
-    feedback: {
-      padding: "14px",
+      borderRadius: "12px",
       marginTop: "12px",
-      background: "#f8fafc",
-      borderRadius: "8px",
-      whiteSpace: "pre-wrap",
     },
   };
 
   return (
-    <section style={styles.container}>
-      <h2 style={styles.heading}>Student Progress & Report Cards 📊</h2>
+    <div style={styles.container}>
+      <h2>🏆 Learnova Coin Management</h2>
 
-      <p style={styles.subtitle}>
-        Generate academic progress reports for your students.
+      <p style={{ color: "#777" }}>
+        Award coins and manage student deductions.
       </p>
 
-      {error && <div style={styles.error}>{error}</div>}
+      {message && (
+        <p style={{
+          color:
+            message.includes("successfully")
+              ? "green"
+              : "crimson",
+        }}>
+          {message}
+        </p>
+      )}
 
-      <div style={styles.controls}>
-        <label style={styles.label}>
-          Select Student
+      <h3>Award or Deduct Coins</h3>
+
+      <form onSubmit={submitTransaction}>
+        <div style={styles.field}>
+          <label>Select Student *</label>
           <select
-            value={studentId}
-            onChange={(e) => setStudentId(e.target.value)}
+            name="student_id"
+            value={form.student_id}
+            onChange={handleChange}
+            required
             style={styles.input}
-            disabled={studentsLoading}
           >
-            <option value="">Choose student</option>
+            <option value="">Choose a student</option>
+
             {students.map((student) => (
               <option key={student.id} value={student.id}>
                 {student.full_name}
               </option>
             ))}
           </select>
-        </label>
-
-        <label style={styles.label}>
-          Report Type
-          <select
-            value={period}
-            onChange={(e) => handlePeriodChange(e.target.value)}
-            style={styles.input}
-          >
-            <option value="monthly">Monthly Report</option>
-            <option value="term">Term Report</option>
-          </select>
-        </label>
-
-        <label style={styles.label}>
-          Start Date
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            style={styles.input}
-          />
-        </label>
-
-        <label style={styles.label}>
-          End Date
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            style={styles.input}
-          />
-        </label>
-      </div>
-
-      <button
-        type="button"
-        onClick={generateReport}
-        disabled={loading || studentsLoading || !studentId}
-        style={styles.button}
-      >
-        {loading ? "Generating..." : "Generate Report"}
-      </button>
-
-      {studentsLoading && <p>Loading students...</p>}
-
-      {!studentsLoading && students.length === 0 && (
-        <p>No student records found.</p>
-      )}
-
-      {report && (
-        <div style={styles.report} id="learnova-report">
-          <div style={styles.reportTitle}>
-            <h1 style={{ margin: 0, letterSpacing: "2px" }}>
-              LEARNOVA
-            </h1>
-            <h2>STUDENT PROGRESS REPORT</h2>
-            <p>
-              {period === "monthly" ? "Monthly Report" : "Term Report"}
-            </p>
-            <p>
-              {formatDate(startDate)} – {formatDate(endDate)}
-            </p>
-          </div>
-
-          <h3 style={styles.sectionTitle}>Student Information</h3>
-          <p>
-            <strong>Name:</strong> {report.student.full_name}
-          </p>
-          <p>
-            <strong>Email:</strong> {report.student.email || "—"}
-          </p>
-
-          <h3 style={styles.sectionTitle}>Academic Summary</h3>
-
-          <div style={styles.stats}>
-            <div style={styles.stat}>
-              <span style={styles.statLabel}>Test Average</span>
-              <span style={styles.statValue}>
-                {percentage(report.testAverage)}
-              </span>
-            </div>
-
-            <div style={styles.stat}>
-              <span style={styles.statLabel}>Homework Accepted</span>
-              <span style={styles.statValue}>
-                {report.accepted}/{report.homeworkRows.length}
-              </span>
-            </div>
-
-            <div style={styles.stat}>
-              <span style={styles.statLabel}>Homework Completion</span>
-              <span style={styles.statValue}>
-                {percentage(report.homeworkPercentage)}
-              </span>
-            </div>
-
-            <div style={styles.stat}>
-              <span style={styles.statLabel}>Class Participation</span>
-              <span style={styles.statValue}>
-                {percentage(report.participationPercentage)}
-              </span>
-            </div>
-
-            <div style={styles.stat}>
-              <span style={styles.statLabel}>Attendance</span>
-              <span style={styles.statValue}>
-                {percentage(report.attendancePercentage)}
-              </span>
-            </div>
-          </div>
-
-          <h3 style={styles.sectionTitle}>Test Performance</h3>
-
-          {report.tests.length === 0 ? (
-            <p>No test records for this period.</p>
-          ) : (
-            <div style={styles.tableWrapper}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Subject</th>
-                    <th style={styles.th}>Assessment</th>
-                    <th style={styles.th}>Marks</th>
-                    <th style={styles.th}>Percentage</th>
-                    <th style={styles.th}>Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.tests.map((item) => (
-                    <tr key={item.id}>
-                      <td style={styles.td}>{item.subject}</td>
-                      <td style={styles.td}>{item.title}</td>
-                      <td style={styles.td}>
-                        {item.marks_obtained}/{item.max_marks}
-                      </td>
-                      <td style={styles.td}>
-                        {percentage(
-                          Number(item.marks_obtained) /
-                          Number(item.max_marks) * 100
-                        )}
-                      </td>
-                      <td style={styles.td}>
-                        {formatDate(item.assessment_date)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <h3 style={styles.sectionTitle}>Homework Performance</h3>
-
-          <p>
-            Accepted: {report.accepted} | Awaiting review: {report.awaiting}
-            {" | "}Recheck required: {report.recheck}
-            {" | "}Not submitted: {report.notSubmitted}
-          </p>
-
-          {report.homeworkRows.length > 0 && (
-            <div style={styles.tableWrapper}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Homework</th>
-                    <th style={styles.th}>Subject</th>
-                    <th style={styles.th}>Status</th>
-                    <th style={styles.th}>Deadline</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.homeworkRows.map((item) => (
-                    <tr key={item.id}>
-                      <td style={styles.td}>{item.title}</td>
-                      <td style={styles.td}>{item.subject || "—"}</td>
-                      <td style={styles.td}>{item.status}</td>
-                      <td style={styles.td}>
-                        {formatDate(item.due_date)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <h3 style={styles.sectionTitle}>Class Participation</h3>
-
-          {report.participation.length === 0 ? (
-            <p>No participation records for this period.</p>
-          ) : (
-            <div style={styles.tableWrapper}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Subject</th>
-                    <th style={styles.th}>Activity</th>
-                    <th style={styles.th}>Marks</th>
-                    <th style={styles.th}>Teacher Remarks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.participation.map((item) => (
-                    <tr key={item.id}>
-                      <td style={styles.td}>{item.subject}</td>
-                      <td style={styles.td}>{item.title}</td>
-                      <td style={styles.td}>
-                        {item.marks_obtained}/{item.max_marks}
-                      </td>
-                      <td style={styles.td}>{item.remarks || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <h3 style={styles.sectionTitle}>Attendance Summary</h3>
-
-          <p>
-            Total recorded classes: {report.attendance.length}
-          </p>
-          <p>
-            Present: {report.present} | Absent: {report.absent}
-          </p>
-
-          {report.attendance.length > 0 && (
-            <div style={styles.tableWrapper}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Date</th>
-                    <th style={styles.th}>Status</th>
-                    <th style={styles.th}>Remarks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.attendance.map((item) => (
-                    <tr key={item.id}>
-                      <td style={styles.td}>
-                        {formatDate(item.attendance_date)}
-                      </td>
-                      <td style={styles.td}>{item.status}</td>
-                      <td style={styles.td}>{item.remarks || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <h3 style={styles.sectionTitle}>Teacher Feedback</h3>
-
-          {report.performance.some((item) => item.remarks) ? (
-            report.performance
-              .filter((item) => item.remarks)
-              .map((item) => (
-                <div key={item.id} style={styles.feedback}>
-                  <strong>
-                    {item.subject} — {item.title}
-                  </strong>
-                  <p>{item.remarks}</p>
-                </div>
-              ))
-          ) : (
-            <p>No teacher feedback recorded for this period.</p>
-          )}
-
-          <div style={{ marginTop: "30px", textAlign: "center" }}>
-            <p>Thank you for being a part of Learnova!</p>
-            <p>Teacher's Signature: __________________</p>
-          </div>
-
-          <button
-            type="button"
-            onClick={printReport}
-            style={styles.button}
-          >
-            Print / Save Report as PDF
-          </button>
         </div>
+
+        {form.student_id && (
+          <p>
+            Current monthly balance:{" "}
+            <strong>
+              {balances[form.student_id] || 0} coins
+            </strong>
+          </p>
+        )}
+
+        <div style={styles.field}>
+          <label>Transaction Type *</label>
+          <select
+            name="transaction_type"
+            value={form.transaction_type}
+            onChange={handleChange}
+            style={styles.input}
+          >
+            <option value="Earned">Award Coins (+)</option>
+            <option value="Deducted">Deduct Coins (-)</option>
+          </select>
+        </div>
+
+        <div style={styles.field}>
+          <label>Activity *</label>
+          <select
+            name="activity"
+            value={form.activity}
+            onChange={handleChange}
+            style={styles.input}
+          >
+            <option value="Teacher Bonus">Teacher Bonus</option>
+            <option value="Class Violation">Class Violation</option>
+            <option value="Attendance">Attendance</option>
+            <option value="Homework">Homework</option>
+            <option value="Test">Test Performance</option>
+            <option value="Participation">Class Participation</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div style={styles.field}>
+          <label>Number of Coins *</label>
+          <input
+            type="number"
+            name="coins"
+            min="1"
+            step="1"
+            value={form.coins}
+            onChange={handleChange}
+            placeholder="Enter coins"
+            required
+            style={styles.input}
+          />
+        </div>
+
+        <div style={styles.field}>
+          <label>Reason *</label>
+          <textarea
+            name="reason"
+            value={form.reason}
+            onChange={handleChange}
+            placeholder="Explain why coins are awarded or deducted..."
+            rows="3"
+            required
+            style={styles.input}
+          />
+        </div>
+
+        <button type="submit" style={styles.button}>
+          Submit Transaction
+        </button>
+      </form>
+
+      <hr style={{
+        margin: "28px 0",
+        border: "none",
+        borderTop: "1px solid #eee",
+      }} />
+
+      <h3>Monthly Student Balances</h3>
+
+      {loading ? (
+        <p>Loading...</p>
+      ) : (
+        students.map((student) => (
+          <div key={student.id} style={styles.card}>
+            <strong>{student.full_name}</strong>
+            <p>
+              Monthly Coins:{" "}
+              <strong>
+                {balances[student.id] || 0}
+              </strong>
+            </p>
+          </div>
+        ))
       )}
-    </section>
+
+      <hr style={{
+        margin: "28px 0",
+        border: "none",
+        borderTop: "1px solid #eee",
+      }} />
+
+      <h3>Recent Coin Transactions</h3>
+
+      {transactions.length === 0 ? (
+        <p style={{ color: "#777" }}>
+          No transactions recorded this month.
+        </p>
+      ) : (
+        transactions.map((item) => (
+          <div key={item.id} style={styles.card}>
+            <strong>{getStudentName(item.student_id)}</strong>
+
+            <p style={{
+              color:
+                item.transaction_type === "Earned"
+                  ? "green"
+                  : "crimson",
+              fontWeight: "600",
+            }}>
+              {item.transaction_type === "Earned" ? "+" : "-"}
+              {item.coins} coins
+            </p>
+
+            <p>Activity: {item.activity}</p>
+            <p>Reason: {item.reason}</p>
+
+            <small style={{ color: "#999" }}>
+              {new Date(item.created_at).toLocaleString()}
+            </small>
+          </div>
+        ))
+      )}
+    </div>
   );
 }
-
-export default ReportCards;
