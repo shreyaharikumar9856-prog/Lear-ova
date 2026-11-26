@@ -7,7 +7,6 @@ function ReportCards() {
   const [studentId, setStudentId] = useState("");
   const [period, setPeriod] = useState("monthly");
 
-  const today = new Date();
   const toLocalDate = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -15,11 +14,10 @@ function ReportCards() {
     return `${year}-${month}-${day}`;
   };
 
-  const firstDay = toLocalDate(
-    new Date(today.getFullYear(), today.getMonth(), 1)
+  const today = new Date();
+  const [startDate, setStartDate] = useState(
+    toLocalDate(new Date(today.getFullYear(), today.getMonth(), 1))
   );
-
-  const [startDate, setStartDate] = useState(firstDay);
   const [endDate, setEndDate] = useState(toLocalDate(today));
 
   const [report, setReport] = useState(null);
@@ -27,9 +25,12 @@ function ReportCards() {
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [grade, setGrade] = useState("");
+  const [homeworkNotes, setHomeworkNotes] = useState("");
   const [teacherFeedback, setTeacherFeedback] = useState("");
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
-  const [feedbackMessage, setFeedbackMessage] = useState("");
+
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
     loadStudents();
@@ -42,7 +43,7 @@ function ReportCards() {
     try {
       const { data, error } = await supabase
         .from("students")
-        .select("id, full_name, email")
+        .select("id, full_name")
         .order("full_name");
 
       if (error) throw error;
@@ -94,22 +95,23 @@ function ReportCards() {
 
     setLoading(true);
     setError("");
+    setSaveMessage("");
     setReport(null);
+    setGrade("");
+    setHomeworkNotes("");
     setTeacherFeedback("");
-    setFeedbackMessage("");
 
     try {
       const [
         studentResult,
         performanceResult,
         attendanceResult,
-        assignmentsResult,
         coinResult,
         feedbackResult,
       ] = await Promise.all([
         supabase
           .from("students")
-          .select("id, full_name, email")
+          .select("id, full_name")
           .eq("id", studentId)
           .single(),
 
@@ -117,25 +119,18 @@ function ReportCards() {
           .from("student_performance")
           .select("*")
           .eq("student_id", studentId)
+          .eq("category", "Test")
           .gte("assessment_date", startDate)
           .lte("assessment_date", endDate)
           .order("assessment_date", { ascending: true }),
 
         supabase
           .from("attendance")
-          .select("id, attendance_date, status, remarks")
+          .select("id, attendance_date, status")
           .eq("student_id", studentId)
           .gte("attendance_date", startDate)
           .lte("attendance_date", endDate)
           .order("attendance_date", { ascending: true }),
-
-        supabase
-          .from("assignments")
-          .select("id, title, subject, assigned_at, due_date")
-          .eq("student_id", studentId)
-          .gte("assigned_at", `${startDate}T00:00:00`)
-          .lte("assigned_at", `${endDate}T23:59:59.999`)
-          .order("assigned_at", { ascending: true }),
 
         supabase
           .from("coin_transactions")
@@ -147,7 +142,7 @@ function ReportCards() {
 
         supabase
           .from("report_feedback")
-          .select("feedback")
+          .select("grade, homework_notes, feedback")
           .eq("student_id", studentId)
           .eq("start_date", startDate)
           .eq("end_date", endDate)
@@ -157,62 +152,12 @@ function ReportCards() {
       if (studentResult.error) throw studentResult.error;
       if (performanceResult.error) throw performanceResult.error;
       if (attendanceResult.error) throw attendanceResult.error;
-      if (assignmentsResult.error) throw assignmentsResult.error;
       if (coinResult.error) throw coinResult.error;
       if (feedbackResult.error) throw feedbackResult.error;
 
-      const assignments = assignmentsResult.data || [];
-      let submissions = [];
-
-      if (assignments.length > 0) {
-        const assignmentIds = assignments.map((item) => item.id);
-
-        const { data, error } = await supabase
-          .from("assignment_submissions")
-          .select("id, assignment_id, review_status, submitted_at")
-          .eq("student_id", studentId)
-          .in("assignment_id", assignmentIds)
-          .order("submitted_at", { ascending: false });
-
-        if (error) throw error;
-
-        submissions = data || [];
-      }
-
-      const latestSubmissions = new Map();
-
-      submissions.forEach((submission) => {
-        const existing = latestSubmissions.get(submission.assignment_id);
-
-        if (
-          !existing ||
-          new Date(submission.submitted_at).getTime() >
-            new Date(existing.submitted_at).getTime()
-        ) {
-          latestSubmissions.set(submission.assignment_id, submission);
-        }
-      });
-
-      const homeworkRows = assignments.map((assignment) => {
-        const submission = latestSubmissions.get(assignment.id);
-
-        return {
-          ...assignment,
-          status: submission?.review_status || "Not Submitted",
-        };
-      });
-
-      const performance = performanceResult.data || [];
+      const tests = performanceResult.data || [];
       const attendance = attendanceResult.data || [];
       const coinTransactions = coinResult.data || [];
-
-      const tests = performance.filter(
-        (item) => item.category === "Test"
-      );
-
-      const participation = performance.filter(
-        (item) => item.category === "Participation"
-      );
 
       const totalObtained = tests.reduce(
         (sum, item) => sum + (Number(item.marks_obtained) || 0),
@@ -226,26 +171,6 @@ function ReportCards() {
 
       const testAverage = totalMaximum > 0
         ? (totalObtained / totalMaximum) * 100
-        : null;
-
-      const accepted = homeworkRows.filter(
-        (item) => item.status === "Accepted"
-      ).length;
-
-      const awaiting = homeworkRows.filter(
-        (item) => item.status === "Submitted"
-      ).length;
-
-      const recheck = homeworkRows.filter(
-        (item) => item.status === "Recheck Required"
-      ).length;
-
-      const notSubmitted = homeworkRows.filter(
-        (item) => item.status === "Not Submitted"
-      ).length;
-
-      const homeworkPercentage = homeworkRows.length
-        ? (accepted / homeworkRows.length) * 100
         : null;
 
       const present = attendance.filter(
@@ -262,20 +187,6 @@ function ReportCards() {
         ? (present / recordedAttendance) * 100
         : null;
 
-      const participationObtained = participation.reduce(
-        (sum, item) => sum + (Number(item.marks_obtained) || 0),
-        0
-      );
-
-      const participationMaximum = participation.reduce(
-        (sum, item) => sum + (Number(item.max_marks) || 0),
-        0
-      );
-
-      const participationPercentage = participationMaximum > 0
-        ? (participationObtained / participationMaximum) * 100
-        : null;
-
       const earnedCoins = coinTransactions
         .filter((item) => item.transaction_type === "Earned")
         .reduce((sum, item) => sum + Number(item.coins || 0), 0);
@@ -284,25 +195,20 @@ function ReportCards() {
         .filter((item) => item.transaction_type === "Deducted")
         .reduce((sum, item) => sum + Number(item.coins || 0), 0);
 
-      setTeacherFeedback(feedbackResult.data?.feedback || "");
+      const savedDetails = feedbackResult.data;
+
+      setGrade(savedDetails?.grade || "");
+      setHomeworkNotes(savedDetails?.homework_notes || "");
+      setTeacherFeedback(savedDetails?.feedback || "");
 
       setReport({
         student: studentResult.data,
-        performance,
         tests,
-        participation,
-        homeworkRows,
         attendance,
         coinTransactions,
-        testAverage,
         totalObtained,
         totalMaximum,
-        homeworkPercentage,
-        participationPercentage,
-        accepted,
-        awaiting,
-        recheck,
-        notSubmitted,
+        testAverage,
         present,
         absent,
         recordedAttendance,
@@ -319,11 +225,11 @@ function ReportCards() {
     }
   }
 
-  async function saveFeedback() {
+  async function saveReportNotes() {
     if (!report) return;
 
-    setFeedbackLoading(true);
-    setFeedbackMessage("");
+    setSaving(true);
+    setSaveMessage("");
 
     try {
       const { error } = await supabase
@@ -333,6 +239,8 @@ function ReportCards() {
             student_id: studentId,
             start_date: startDate,
             end_date: endDate,
+            grade: grade.trim(),
+            homework_notes: homeworkNotes.trim(),
             feedback: teacherFeedback.trim(),
             updated_at: new Date().toISOString(),
           },
@@ -343,12 +251,12 @@ function ReportCards() {
 
       if (error) throw error;
 
-      setFeedbackMessage("Feedback saved successfully!");
+      setSaveMessage("Report details saved successfully.");
     } catch (err) {
-      console.error("Feedback saving error:", err);
-      setFeedbackMessage(`Unable to save feedback: ${err.message}`);
+      console.error("Report saving error:", err);
+      setSaveMessage(`Unable to save: ${err.message}`);
     } finally {
-      setFeedbackLoading(false);
+      setSaving(false);
     }
   }
 
@@ -361,8 +269,7 @@ function ReportCards() {
   function formatDate(value) {
     if (!value) return "—";
 
-    const datePart = value.slice(0, 10);
-    const [year, month, day] = datePart.split("-");
+    const [year, month, day] = value.slice(0, 10).split("-");
 
     return new Date(
       Number(year),
@@ -372,8 +279,7 @@ function ReportCards() {
   }
 
   function formatDateTime(value) {
-    if (!value) return "—";
-    return new Date(value).toLocaleString();
+    return value ? new Date(value).toLocaleString() : "—";
   }
 
   function printReport() {
@@ -388,11 +294,11 @@ function ReportCards() {
   return (
     <section className="report-container">
       <h2 className="report-heading">
-        Student Progress & Report Cards 📊
+        Student Progress & Report Cards
       </h2>
 
       <p className="report-subtitle">
-        Generate academic progress reports for your students.
+        Create and print professional student progress reports.
       </p>
 
       {error && <div className="report-error">{error}</div>}
@@ -461,44 +367,47 @@ function ReportCards() {
 
       {report && (
         <div className="report-paper" id="learnova-report">
-          <div className="report-title">
-            <h1>LEARNOVA</h1>
+          <header className="report-title">
+            <h1>LEARNOVA ONLINE SESSIONS</h1>
+            <div className="report-title-rule" />
             <h2>STUDENT PROGRESS REPORT</h2>
             <p>
               {period === "monthly" ? "Monthly Report" : "Term Report"}
             </p>
-            <p>
+            <p className="report-period">
               {formatDate(startDate)} – {formatDate(endDate)}
             </p>
-          </div>
+          </header>
 
-          <h3 className="report-section-title">Student Information</h3>
-          <p><strong>Name:</strong> {report.student.full_name}</p>
-          <p><strong>Email:</strong> {report.student.email || "—"}</p>
+          <section className="report-student-details">
+            <div className="student-name">
+              <span>STUDENT NAME</span>
+              <strong>{report.student.full_name}</strong>
+            </div>
 
-          <h3 className="report-section-title">Academic Summary</h3>
+            <label className="grade-field">
+              <span>GRADE / CLASS</span>
+              <input
+                type="text"
+                value={grade}
+                onChange={(e) => setGrade(e.target.value)}
+                placeholder="Enter grade"
+                maxLength={40}
+              />
+            </label>
+          </section>
+
+          <h3 className="report-section-title">Academic Overview</h3>
 
           <div className="report-stats">
             <div className="report-stat">
-              <span>Test Average</span>
+              <span>Overall Test Score</span>
               <strong>{percentage(report.testAverage)}</strong>
             </div>
 
             <div className="report-stat">
-              <span>Homework Accepted</span>
-              <strong>
-                {report.accepted}/{report.homeworkRows.length}
-              </strong>
-            </div>
-
-            <div className="report-stat">
-              <span>Homework Completion</span>
-              <strong>{percentage(report.homeworkPercentage)}</strong>
-            </div>
-
-            <div className="report-stat">
-              <span>Class Participation</span>
-              <strong>{percentage(report.participationPercentage)}</strong>
+              <span>Tests Recorded</span>
+              <strong>{report.tests.length}</strong>
             </div>
 
             <div className="report-stat">
@@ -510,14 +419,17 @@ function ReportCards() {
           <h3 className="report-section-title">Overall Test Performance</h3>
 
           <div className="report-highlight">
+            <span>Overall Marks</span>
             <strong>
-              Overall Score: {report.totalObtained} / {report.totalMaximum}
+              {report.totalObtained} / {report.totalMaximum}
             </strong>
-            <span>{percentage(report.testAverage)}</span>
+            <strong>{percentage(report.testAverage)}</strong>
           </div>
 
           {report.tests.length === 0 ? (
-            <p>No test records for this period.</p>
+            <p className="report-empty">
+              No test records available for this reporting period.
+            </p>
           ) : (
             <div className="report-table-wrapper">
               <table className="report-table">
@@ -554,68 +466,6 @@ function ReportCards() {
             </div>
           )}
 
-          <h3 className="report-section-title">Homework Performance</h3>
-
-          <p>
-            Accepted: {report.accepted} | Awaiting review: {report.awaiting}
-            {" | "}Recheck required: {report.recheck}
-            {" | "}Not submitted: {report.notSubmitted}
-          </p>
-
-          {report.homeworkRows.length > 0 && (
-            <div className="report-table-wrapper">
-              <table className="report-table">
-                <thead>
-                  <tr>
-                    <th>Homework</th>
-                    <th>Subject</th>
-                    <th>Status</th>
-                    <th>Deadline</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.homeworkRows.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.title}</td>
-                      <td>{item.subject || "—"}</td>
-                      <td>{item.status}</td>
-                      <td>{formatDate(item.due_date)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <h3 className="report-section-title">Class Participation</h3>
-
-          {report.participation.length === 0 ? (
-            <p>No participation records for this period.</p>
-          ) : (
-            <div className="report-table-wrapper">
-              <table className="report-table">
-                <thead>
-                  <tr>
-                    <th>Subject</th>
-                    <th>Activity</th>
-                    <th>Marks</th>
-                    <th>Teacher Remarks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.participation.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.subject || "—"}</td>
-                      <td>{item.title || "—"}</td>
-                      <td>{item.marks_obtained}/{item.max_marks}</td>
-                      <td>{item.remarks || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
           <h3 className="report-section-title">Attendance Overview</h3>
 
           <div className="attendance-layout">
@@ -624,8 +474,8 @@ function ReportCards() {
               style={{
                 background: attendanceTotal > 0
                   ? `conic-gradient(
-                      #3b82f6 0deg ${presentAngle}deg,
-                      #ef4444 ${presentAngle}deg 360deg
+                      #3978c5 0deg ${presentAngle}deg,
+                      #df6262 ${presentAngle}deg 360deg
                     )`
                   : "#e5e7eb",
               }}
@@ -639,61 +489,52 @@ function ReportCards() {
             <div className="attendance-legend">
               <p>
                 <span className="legend-dot present-dot" />
-                Present: <strong>{report.present}</strong>
-                {attendanceTotal > 0
-                  ? ` (${percentage(report.present / attendanceTotal * 100)})`
-                  : ""}
+                Present
+                <strong>{report.present}</strong>
               </p>
 
               <p>
                 <span className="legend-dot absent-dot" />
-                Absent: <strong>{report.absent}</strong>
-                {attendanceTotal > 0
-                  ? ` (${percentage(report.absent / attendanceTotal * 100)})`
-                  : ""}
+                Absent
+                <strong>{report.absent}</strong>
               </p>
 
-              <p>Total recorded classes: {report.attendance.length}</p>
-              <p>Counted classes: {report.recordedAttendance}</p>
+              <p className="attendance-total">
+                Total Classes
+                <strong>{report.recordedAttendance}</strong>
+              </p>
             </div>
           </div>
 
-          {report.attendance.length > 0 ? (
-            <div className="report-table-wrapper">
-              <table className="report-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th>Remarks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.attendance.map((item) => (
-                    <tr key={item.id}>
-                      <td>{formatDate(item.attendance_date)}</td>
-                      <td>{item.status}</td>
-                      <td>{item.remarks || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p>No attendance records for this period.</p>
-          )}
+          <h3 className="report-section-title">Homework Notes</h3>
 
-          <h3 className="report-section-title">Learnova Coin History 🪙</h3>
+          <div className="editable-report-box">
+            <p className="editable-hint">
+              Teacher's homework observations and comments
+            </p>
+            <textarea
+              value={homeworkNotes}
+              onChange={(e) => setHomeworkNotes(e.target.value)}
+              placeholder="Write about homework completion, consistency, areas that need attention, or improvements..."
+              rows={5}
+            />
+          </div>
+
+          <h3 className="report-section-title">Learnova Coin History</h3>
 
           <div className="coin-summary">
             <div>
               <span>Coins Earned</span>
-              <strong className="coin-earned">+{report.earnedCoins}</strong>
+              <strong className="coin-earned">
+                +{report.earnedCoins}
+              </strong>
             </div>
 
             <div>
               <span>Coins Deducted</span>
-              <strong className="coin-deducted">-{report.deductedCoins}</strong>
+              <strong className="coin-deducted">
+                -{report.deductedCoins}
+              </strong>
             </div>
 
             <div>
@@ -703,7 +544,9 @@ function ReportCards() {
           </div>
 
           {report.coinTransactions.length === 0 ? (
-            <p>No coin transactions for this reporting period.</p>
+            <p className="report-empty">
+              No coin transactions recorded during this period.
+            </p>
           ) : (
             <div className="report-table-wrapper">
               <table className="report-table">
@@ -712,7 +555,7 @@ function ReportCards() {
                     <th>Date</th>
                     <th>Activity</th>
                     <th>Reason</th>
-                    <th>Transaction</th>
+                    <th>Coins</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -729,7 +572,7 @@ function ReportCards() {
                         }
                       >
                         {item.transaction_type === "Earned" ? "+" : "-"}
-                        {item.coins} coins
+                        {item.coins}
                       </td>
                     </tr>
                   ))}
@@ -738,52 +581,55 @@ function ReportCards() {
             </div>
           )}
 
-          <h3 className="report-section-title">Teacher's Feedback Corner 💬</h3>
+          <h3 className="report-section-title">Teacher's Feedback</h3>
 
-          <div className="teacher-feedback-box">
-            <p>
-              Share your observations about the student's progress,
-              strengths and areas for improvement.
+          <div className="editable-report-box feedback-box">
+            <p className="editable-hint">
+              Personal feedback on the student's progress, strengths
+              and areas for improvement
             </p>
-
             <textarea
               value={teacherFeedback}
               onChange={(e) => setTeacherFeedback(e.target.value)}
-              placeholder="Write your feedback here..."
+              placeholder="Write your feedback about the student here..."
               rows={6}
               maxLength={3000}
             />
-
-            <div className="feedback-actions">
-              <span>{teacherFeedback.length}/3000 characters</span>
-
-              <button
-                type="button"
-                className="report-button"
-                onClick={saveFeedback}
-                disabled={feedbackLoading}
-              >
-                {feedbackLoading ? "Saving..." : "Save Feedback"}
-              </button>
-            </div>
-
-            {feedbackMessage && (
-              <p className="feedback-message">{feedbackMessage}</p>
-            )}
+            <span className="character-count">
+              {teacherFeedback.length}/3000 characters
+            </span>
           </div>
 
-          <div className="report-signature">
+          <footer className="report-footer">
             <p>Thank you for being a part of Learnova!</p>
-            <p>Teacher's Signature: __________________</p>
+            <div className="signature-line">
+              <span>Teacher's Signature</span>
+              <span>________________________</span>
+            </div>
+          </footer>
+
+          <div className="report-actions">
+            <button
+              type="button"
+              className="report-button"
+              onClick={saveReportNotes}
+              disabled={saving}
+            >
+              {saving ? "Saving..." : "Save Report Details"}
+            </button>
+
+            <button
+              type="button"
+              className="report-button print-button"
+              onClick={printReport}
+            >
+              Print / Save as PDF
+            </button>
           </div>
 
-          <button
-            type="button"
-            className="report-button print-button"
-            onClick={printReport}
-          >
-            Print / Save Report as PDF
-          </button>
+          {saveMessage && (
+            <p className="save-message">{saveMessage}</p>
+          )}
         </div>
       )}
     </section>
