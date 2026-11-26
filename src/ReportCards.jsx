@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import "./ReportCards.css";
 
-function ReportCards() {
+function ReportCards() { 
   const [students, setStudents] = useState([]);
   const [studentId, setStudentId] = useState("");
   const [period, setPeriod] = useState("monthly");
